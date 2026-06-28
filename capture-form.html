@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>BMC Field Data Capture — New Visit</title>
+<link rel="stylesheet" href="capture-form.css">
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="top-bar-left">
+    <span class="brand-mark-sm">BMC</span>
+  </div>
+  <div class="top-bar-right">
+    <span id="connection-status" class="status-pill online">Online</span>
+    <button id="drafts-btn" class="icon-btn" type="button">Drafts (0)</button>
+    <button id="logout-btn" class="icon-btn" aria-label="Log out">Log out</button>
+  </div>
+</header>
+
+<main class="page">
+
+  <div id="auth-guard" class="guard-message">Checking your session...</div>
+
+  <form id="capture-form" class="capture-form" novalidate hidden>
+
+    <h1 class="page-title">New visit record</h1>
+    <p class="page-sub">Submission ref: <span id="submission-ref">—</span></p>
+
+    <!-- Contact & business details -->
+    <section class="form-section">
+      <h2 class="section-title">Business details</h2>
+
+      <div class="field">
+        <label for="contact-name">Contact name <span class="req">*</span></label>
+        <input type="text" id="contact-name" name="contact_name" required autocomplete="name">
+        <p class="field-error" id="contact-name-error"></p>
+      </div>
+
+      <div class="field">
+        <label for="business-name">Business name <span class="req">*</span></label>
+        <input type="text" id="business-name" name="business_name" required>
+        <p class="field-error" id="business-name-error"></p>
+      </div>
+
+      <div class="field">
+        <label for="business-address">Business address <span class="req">*</span></label>
+        <textarea id="business-address" name="business_address" rows="2" required></textarea>
+        <p class="field-error" id="business-address-error"></p>
+      </div>
+
+      <div class="field">
+        <label for="phone-number">Phone number <span class="req">*</span></label>
+        <input type="tel" id="phone-number" name="phone_number" required placeholder="e.g. 07123 456789" inputmode="tel">
+        <p class="field-error" id="phone-number-error"></p>
+      </div>
+
+      <div class="field">
+        <label for="years-in-business">Years in business <span class="req">*</span></label>
+        <input type="number" id="years-in-business" name="years_in_business" required min="0" max="200" step="1" inputmode="numeric">
+        <p class="field-error" id="years-in-business-error"></p>
+      </div>
+
+      <div class="field">
+        <label for="customers-per-day">Estimated customers per day <span class="req">*</span></label>
+        <input type="number" id="customers-per-day" name="customers_per_day" required min="0" max="100000" step="1" inputmode="numeric">
+        <p class="field-error" id="customers-per-day-error"></p>
+      </div>
+    </section>
+
+    <!-- Brands -->
+    <section class="form-section">
+      <h2 class="section-title">Top 3 brands serviced</h2>
+      <p class="section-hint">Enter up to three. Only the first is required.</p>
+
+      <!--
+        Simplified to plain text inputs for now instead of a dropdown/checkbox
+        list against the brands table. Revisit once the brand list UX is decided.
+      -->
+      <div class="field">
+        <label for="brand-1">Brand 1 <span class="req">*</span></label>
+        <input type="text" id="brand-1" name="brand_1" required>
+      </div>
+
+      <div class="field">
+        <label for="brand-2">Brand 2</label>
+        <input type="text" id="brand-2" name="brand_2">
+      </div>
+
+      <div class="field">
+        <label for="brand-3">Brand 3</label>
+        <input type="text" id="brand-3" name="brand_3">
+      </div>
+      <p class="field-error" id="brands-error"></p>
+    </section>
+
+    <!-- Photo + location -->
+    <section class="form-section">
+      <h2 class="section-title">Photo</h2>
+
+      <div class="field">
+        <label for="photo-input">Take or upload a photo <span class="req">*</span></label>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" required>
+        <div id="photo-preview-wrap" class="photo-preview-wrap" hidden>
+          <img id="photo-preview" alt="Captured photo preview">
+        </div>
+        <p class="field-error" id="photo-error"></p>
+      </div>
+
+      <div class="location-status" id="location-status">
+        <span class="location-dot" id="location-dot"></span>
+        <span id="location-text">Location will be captured with your photo</span>
+      </div>
+    </section>
+
+    <!-- Notes -->
+    <section class="form-section">
+      <h2 class="section-title">Notes</h2>
+      <div class="field">
+        <label for="notes">Additional notes (optional)</label>
+        <textarea id="notes" name="notes" rows="3"></textarea>
+      </div>
+    </section>
+
+    <p class="form-message" id="form-message" role="alert"></p>
+
+    <button type="submit" class="btn-primary" id="submit-btn">
+      <span class="btn-label">Submit visit record</span>
+      <span class="spinner" hidden></span>
+    </button>
+
+    <button type="button" class="btn-secondary" id="save-draft-btn">
+      Save as draft
+    </button>
+
+  </form>
+
+  <div id="success-screen" class="success-screen" hidden>
+    <div class="success-icon">✓</div>
+    <h1>Submission saved</h1>
+    <p id="success-detail">Your visit record has been recorded.</p>
+    <button class="btn-primary" id="new-submission-btn">Start new visit</button>
+  </div>
+
+</main>
+
+<!-- Drafts panel -->
+<div id="drafts-overlay" class="drafts-overlay" hidden>
+  <div id="drafts-panel" class="drafts-panel">
+    <div class="drafts-panel-header">
+      <h2>Drafts on this device</h2>
+      <button id="close-drafts-btn" class="drafts-close-btn" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div id="drafts-list" class="drafts-list"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="capture-form.js"></script>
+</body>
+</html>
