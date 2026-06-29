@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMC Field Data Capture — Admin Dashboard</title>
+<link rel="stylesheet" href="admin-dashboard.css">
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="top-bar-left">
+    <span class="brand-mark-sm">BMC</span>
+    <span class="top-bar-title">Admin Dashboard</span>
+  </div>
+  <div class="top-bar-right">
+    <span id="admin-name" class="admin-name"></span>
+    <button id="logout-btn" class="icon-btn">Log out</button>
+  </div>
+</header>
+
+<div id="auth-guard" class="guard-message">Checking your session...</div>
+
+<div id="dashboard-shell" class="dashboard-shell" hidden>
+
+  <nav class="tab-nav" role="tablist">
+    <button class="tab-btn active" data-tab="users" role="tab">Users</button>
+    <button class="tab-btn" data-tab="submissions" role="tab">Submissions</button>
+    <button class="tab-btn" data-tab="map" role="tab">Map</button>
+    <button class="tab-btn" data-tab="audit" role="tab">Audit Log</button>
+  </nav>
+
+  <!-- ================= USERS TAB ================= -->
+  <section class="tab-panel active" id="panel-users">
+
+    <div class="panel-header">
+      <h1>Users</h1>
+      <div class="panel-header-actions">
+        <select id="users-filter-status" class="select-input">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select id="users-filter-role" class="select-input">
+          <option value="">All roles</option>
+          <option value="admin">Admin</option>
+          <option value="field_agent">Field agent</option>
+        </select>
+      </div>
+    </div>
+
+    <p id="users-message" class="panel-message" role="alert"></p>
+
+    <div class="table-wrap">
+      <table class="data-table" id="users-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-table-body">
+          <tr><td colspan="6" class="table-loading">Loading users...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </section>
+
+  <!-- ================= SUBMISSIONS TAB ================= -->
+  <section class="tab-panel" id="panel-submissions">
+    <div class="panel-header">
+      <h1>Submissions</h1>
+    </div>
+    <p class="placeholder-note">Submissions search, filtering, and export will be built next.</p>
+  </section>
+
+  <!-- ================= MAP TAB ================= -->
+  <section class="tab-panel" id="panel-map">
+    <div class="panel-header">
+      <h1>Map</h1>
+    </div>
+    <p class="placeholder-note">Map view of captured submission locations will be built next.</p>
+  </section>
+
+  <!-- ================= AUDIT LOG TAB ================= -->
+  <section class="tab-panel" id="panel-audit">
+    <div class="panel-header">
+      <h1>Audit Log</h1>
+    </div>
+    <p class="placeholder-note">Audit trail view will be built next.</p>
+  </section>
+
+</div>
+
+<!-- Confirmation modal, reused for role changes / deactivation / approval -->
+<div id="confirm-overlay" class="confirm-overlay" hidden>
+  <div class="confirm-box">
+    <p id="confirm-message"></p>
+    <div class="confirm-actions">
+      <button id="confirm-cancel-btn" class="btn-secondary-sm" type="button">Cancel</button>
+      <button id="confirm-ok-btn" class="btn-primary-sm" type="button">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
+<script src="admin-dashboard.js"></script>
+</body>
+</html>
