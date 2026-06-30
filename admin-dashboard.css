@@ -171,6 +171,24 @@ body {
   text-align: center;
 }
 
+.panel-sub-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin: -8px 0 16px;
+}
+
+.add-brand-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.add-brand-form .text-input {
+  flex: 1;
+  min-width: 200px;
+}
+
 /* Messages */
 .panel-message {
   margin: 0 0 14px;
@@ -620,5 +638,100 @@ body {
 @media (max-width: 480px) {
   .map-container {
     height: 400px;
+  }
+}
+
+/* Submissions filter bar */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.filter-bar .text-input,
+.filter-bar .select-input {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+
+.filter-bar button {
+  flex: 0 0 auto;
+}
+
+/* Submission detail modal */
+.submission-detail-box {
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.detail-section {
+  margin-bottom: 18px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.detail-section h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row-label {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.detail-row-value {
+  text-align: right;
+  word-break: break-word;
+}
+
+.detail-photo {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: #F0F0EC;
+}
+
+.detail-no-photo,
+.detail-no-location {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .filter-bar {
+    flex-direction: column;
+  }
+
+  .filter-bar .text-input,
+  .filter-bar .select-input {
+    width: 100%;
   }
 }

@@ -93,12 +93,11 @@ loginForm.addEventListener('submit', async (e) => {
     return;
   }
 
-  // Check the user's profile status before letting them in.
-  const userId = data.user.id;
+  // Check the user's profile status and role before letting them in.
   const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('status, role')
-    .eq('id', userId)
+    .eq('id', data.user.id)
     .single();
 
   if (profileError || !profile) {
@@ -120,8 +119,6 @@ loginForm.addEventListener('submit', async (e) => {
   }
 
   setFormMessage('login-message', 'Logged in. Redirecting...', 'success');
-
-  // Route based on role.
   window.location.href = profile.role === 'admin' ? 'admin-dashboard.html' : 'capture-form.html';
 });
 

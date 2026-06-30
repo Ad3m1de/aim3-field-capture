@@ -179,10 +179,10 @@ async function loadDraftIntoForm(draft) {
   document.getElementById('customers-per-day').value = fd.customers_per_day ?? '';
   document.getElementById('notes').value = fd.notes || '';
 
-  const brandNames = fd.brand_names || [];
-  document.getElementById('brand-1').value = brandNames[0] || '';
-  document.getElementById('brand-2').value = brandNames[1] || '';
-  document.getElementById('brand-3').value = brandNames[2] || '';
+  const brandIds = fd.brand_ids || [];
+  document.getElementById('brand-1').value = brandIds[0] || '';
+  document.getElementById('brand-2').value = brandIds[1] || '';
+  document.getElementById('brand-3').value = brandIds[2] || '';
 
   // Restore photo preview and the in-memory file used on resubmit.
   if (draft.photoDataUrl) {
@@ -237,6 +237,7 @@ async function checkAuth() {
   document.getElementById('capture-form').hidden = false;
   document.getElementById('submission-ref').textContent = generateSubmissionRef();
 
+  await loadBrands();
   updateConnectionStatus();
 }
 
@@ -252,35 +253,36 @@ function generateSubmissionRef() {
   return `BMC-${ts}-${rand}`;
 }
 
-// ===== Load brands — commented out for now since brands are plain text inputs =====
-// Previously populated three <select> dropdowns from the brands table.
-// Re-enable (and restore the <select> markup in capture-form.html) once the
-// brand list UX is decided.
-//
-// async function loadBrands() {
-//   const { data: brands, error } = await supabaseClient
-//     .from('brands')
-//     .select('id, name')
-//     .eq('active', true)
-//     .order('name');
-//
-//   const selects = [
-//     document.getElementById('brand-1'),
-//     document.getElementById('brand-2'),
-//     document.getElementById('brand-3')
-//   ];
-//
-//   if (error || !brands) return;
-//
-//   selects.forEach(select => {
-//     brands.forEach(brand => {
-//       const opt = document.createElement('option');
-//       opt.value = brand.id;
-//       opt.textContent = brand.name;
-//       select.appendChild(opt);
-//     });
-//   });
-// }
+// ===== Load brands into the three dropdowns =====
+async function loadBrands() {
+  const { data: brands, error } = await supabaseClient
+    .from('brands')
+    .select('id, name')
+    .eq('active', true)
+    .order('name');
+
+  const selects = [
+    document.getElementById('brand-1'),
+    document.getElementById('brand-2'),
+    document.getElementById('brand-3')
+  ];
+
+  if (error || !brands) {
+    // Offline or load failure — leave selects with just the placeholder.
+    // Field agent can still fill in everything else and sync later, though
+    // they won't be able to pick a brand until the list is reachable.
+    return;
+  }
+
+  selects.forEach(select => {
+    brands.forEach(brand => {
+      const opt = document.createElement('option');
+      opt.value = brand.id;
+      opt.textContent = brand.name;
+      select.appendChild(opt);
+    });
+  });
+}
 
 // ===== Photo capture + geolocation (captured together, per the brief) =====
 const photoInput = document.getElementById('photo-input');
@@ -386,7 +388,7 @@ function validateForm() {
   const phoneNumber = document.getElementById('phone-number').value.trim();
   const yearsInBusiness = document.getElementById('years-in-business').value;
   const customersPerDay = document.getElementById('customers-per-day').value;
-  const brand1 = document.getElementById('brand-1').value.trim();
+  const brand1 = document.getElementById('brand-1').value;
 
   if (!contactName) {
     setFieldError('contact-name', 'contact-name-error', 'Enter the contact name.');
@@ -459,10 +461,10 @@ function collectFormData() {
     years_in_business: Number(document.getElementById('years-in-business').value),
     customers_per_day: Number(document.getElementById('customers-per-day').value),
     notes: document.getElementById('notes').value.trim(),
-    brand_names: [
-      document.getElementById('brand-1').value.trim(),
-      document.getElementById('brand-2').value.trim(),
-      document.getElementById('brand-3').value.trim()
+    brand_ids: [
+      document.getElementById('brand-1').value,
+      document.getElementById('brand-2').value,
+      document.getElementById('brand-3').value
     ].filter(Boolean),
     captured_at: new Date().toISOString(),
     location: capturedLocation
@@ -513,21 +515,16 @@ async function uploadPhotoAndSubmit(formData, photoFile) {
 
   if (subError) throw subError;
 
-  // 2. Link brands — commented out for now since brand_id expects a foreign key
-  //    into the brands table, but brands are currently captured as free text.
-  //    The text values are not being persisted to the database yet.
-  //    Revisit once the brand list UX is decided (e.g. resolve text to a brand_id,
-  //    or add a free-text column directly on submissions).
-  //
-  // if (formData.brand_ids.length > 0) {
-  //   const brandRows = formData.brand_ids.map((brandId, idx) => ({
-  //     submission_id: submission.id,
-  //     brand_id: brandId,
-  //     rank: idx + 1
-  //   }));
-  //   const { error: brandError } = await supabaseClient.from('submission_brands').insert(brandRows);
-  //   if (brandError) throw brandError;
-  // }
+  // 2. Link brands.
+  if (formData.brand_ids.length > 0) {
+    const brandRows = formData.brand_ids.map((brandId, idx) => ({
+      submission_id: submission.id,
+      brand_id: brandId,
+      rank: idx + 1
+    }));
+    const { error: brandError } = await supabaseClient.from('submission_brands').insert(brandRows);
+    if (brandError) throw brandError;
+  }
 
   // 3. Upload photo to storage, then record it.
   const filePath = `${currentUser.id}/${submission.id}-${Date.now()}.jpg`;

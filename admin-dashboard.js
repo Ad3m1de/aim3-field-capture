@@ -3,6 +3,9 @@ let currentAdmin = null;
 let allUsers = [];
 let auditPage = 0;
 const AUDIT_PAGE_SIZE = 20;
+let submissionsPage = 0;
+const SUBMISSIONS_PAGE_SIZE = 20;
+let lastSubmissionsFilters = {};
 
 // ===== Auth guard — admin only =====
 async function checkAuth() {
@@ -55,6 +58,13 @@ tabButtons.forEach(btn => {
     }
     if (target === 'map') {
       loadMap();
+    }
+    if (target === 'submissions') {
+      loadFieldUserOptions();
+      loadSubmissions();
+    }
+    if (target === 'brands') {
+      loadBrandsPanel();
     }
   });
 });
@@ -664,6 +674,625 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ===== Submissions panel message helper =====
+function setSubmissionsMessage(message, type) {
+  const el = document.getElementById('submissions-message');
+  el.textContent = message;
+  el.className = 'panel-message' + (type ? ' ' + type : '');
+}
+
+// ===== Field user filter dropdown =====
+let fieldUserOptionsLoaded = false;
+
+async function loadFieldUserOptions() {
+  if (fieldUserOptionsLoaded) return;
+
+  const { data, error } = await supabaseClient
+    .from('users')
+    .select('id, name, email')
+    .order('name');
+
+  if (error || !data) return;
+
+  const select = document.getElementById('sub-filter-agent');
+  data.forEach(user => {
+    const opt = document.createElement('option');
+    opt.value = user.id;
+    opt.textContent = user.name || user.email;
+    select.appendChild(opt);
+  });
+  fieldUserOptionsLoaded = true;
+}
+
+// ===== Filter wiring =====
+document.getElementById('sub-filter-apply-btn').addEventListener('click', () => {
+  submissionsPage = 0;
+  loadSubmissions();
+});
+
+document.getElementById('sub-filter-clear-btn').addEventListener('click', () => {
+  document.getElementById('sub-filter-business').value = '';
+  document.getElementById('sub-filter-location').value = '';
+  document.getElementById('sub-filter-agent').value = '';
+  document.getElementById('sub-filter-brand').value = '';
+  document.getElementById('sub-filter-from').value = '';
+  document.getElementById('sub-filter-to').value = '';
+  document.getElementById('sub-filter-cust-min').value = '';
+  document.getElementById('sub-filter-cust-max').value = '';
+  submissionsPage = 0;
+  loadSubmissions();
+});
+
+function readSubmissionsFilters() {
+  return {
+    business: document.getElementById('sub-filter-business').value.trim(),
+    location: document.getElementById('sub-filter-location').value.trim(),
+    agentId: document.getElementById('sub-filter-agent').value,
+    brand: document.getElementById('sub-filter-brand').value.trim(),
+    fromDate: document.getElementById('sub-filter-from').value,
+    toDate: document.getElementById('sub-filter-to').value,
+    custMin: document.getElementById('sub-filter-cust-min').value,
+    custMax: document.getElementById('sub-filter-cust-max').value
+  };
+}
+
+// Builds a Supabase query with every active filter applied. Shared between
+// the paginated table load and the export-all-matching-rows function, so
+// the two never drift out of sync with each other.
+async function buildSubmissionsQuery(filters, { forExport } = {}) {
+  let query = supabaseClient
+    .from('submissions')
+    .select(`
+      id, submission_ref, contact_name, business_name, business_address,
+      phone_number, years_in_business, customers_per_day, notes, status,
+      submitted_at, created_at,
+      users:user_id ( id, name, email ),
+      photos ( id, file_path, file_size_bytes, mime_type ),
+      geolocations ( latitude, longitude, accuracy_meters, captured_at ),
+      submission_brands ( rank, brands ( name ) )
+    `, forExport ? {} : { count: 'exact' })
+    .order('created_at', { ascending: false });
+
+  if (filters.business) query = query.ilike('business_name', `%${filters.business}%`);
+  if (filters.location) query = query.ilike('business_address', `%${filters.location}%`);
+  if (filters.agentId) query = query.eq('user_id', filters.agentId);
+  if (filters.fromDate) query = query.gte('created_at', `${filters.fromDate}T00:00:00`);
+  if (filters.toDate) query = query.lte('created_at', `${filters.toDate}T23:59:59`);
+  if (filters.custMin !== '') query = query.gte('customers_per_day', Number(filters.custMin));
+  if (filters.custMax !== '') query = query.lte('customers_per_day', Number(filters.custMax));
+
+  // Brand filter — looks up submissions that have a matching brand name in
+  // submission_brands, using Supabase's nested filter syntax.
+  if (filters.brand) {
+    const { data: matchingBrands } = await supabaseClient
+      .from('brands')
+      .select('id')
+      .ilike('name', `%${filters.brand}%`);
+
+    if (matchingBrands && matchingBrands.length > 0) {
+      const brandIds = matchingBrands.map(b => b.id);
+      const { data: matchingSubs } = await supabaseClient
+        .from('submission_brands')
+        .select('submission_id')
+        .in('brand_id', brandIds);
+
+      if (matchingSubs && matchingSubs.length > 0) {
+        const subIds = [...new Set(matchingSubs.map(s => s.submission_id))];
+        query = query.in('id', subIds);
+      } else {
+        // No submissions match this brand — force empty result.
+        query = query.in('id', [-1]);
+      }
+    } else {
+      // Brand name not found — force empty result.
+      query = query.in('id', [-1]);
+    }
+  }
+
+  if (!forExport) {
+    query = query.range(submissionsPage * SUBMISSIONS_PAGE_SIZE, submissionsPage * SUBMISSIONS_PAGE_SIZE + SUBMISSIONS_PAGE_SIZE - 1);
+  }
+
+  return query;
+}
+
+// ===== Load submissions (paginated table) =====
+async function loadSubmissions() {
+  const tbody = document.getElementById('submissions-table-body');
+  tbody.innerHTML = '<tr><td colspan="8" class="table-loading">Loading submissions...</td></tr>';
+  setSubmissionsMessage('', null);
+
+  const filters = readSubmissionsFilters();
+  lastSubmissionsFilters = filters;
+
+  const { data, error, count } = await buildSubmissionsQuery(filters);
+
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">Could not load submissions.</td></tr>';
+    setSubmissionsMessage('Could not load submissions: ' + error.message, 'error');
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No submissions match these filters.</td></tr>';
+    renderSubmissionsPagination(0);
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.forEach(sub => tbody.appendChild(buildSubmissionRow(sub)));
+  renderSubmissionsPagination(count || 0);
+}
+
+function buildSubmissionRow(sub) {
+  const tr = document.createElement('tr');
+
+  const dateTd = document.createElement('td');
+  dateTd.setAttribute('data-label', 'Date');
+  dateTd.textContent = new Date(sub.created_at).toLocaleDateString();
+
+  const businessTd = document.createElement('td');
+  businessTd.setAttribute('data-label', 'Business');
+  businessTd.textContent = sub.business_name;
+
+  const contactTd = document.createElement('td');
+  contactTd.setAttribute('data-label', 'Contact');
+  contactTd.textContent = sub.contact_name;
+
+  const agentTd = document.createElement('td');
+  agentTd.setAttribute('data-label', 'Field user');
+  agentTd.textContent = sub.users ? (sub.users.name || sub.users.email) : 'Unknown';
+
+  const phoneTd = document.createElement('td');
+  phoneTd.setAttribute('data-label', 'Phone');
+  phoneTd.textContent = sub.phone_number;
+
+  const custTd = document.createElement('td');
+  custTd.setAttribute('data-label', 'Customers/day');
+  custTd.textContent = sub.customers_per_day ?? '—';
+
+  const statusTd = document.createElement('td');
+  statusTd.setAttribute('data-label', 'Status');
+  const statusBadge = document.createElement('span');
+  statusBadge.className = `badge status-${sub.status === 'submitted' ? 'active' : 'pending'}`;
+  statusBadge.textContent = sub.status.charAt(0).toUpperCase() + sub.status.slice(1);
+  statusTd.appendChild(statusBadge);
+
+  const detailsTd = document.createElement('td');
+  detailsTd.setAttribute('data-label', 'Details');
+  const viewBtn = document.createElement('button');
+  viewBtn.type = 'button';
+  viewBtn.className = 'link-btn';
+  viewBtn.textContent = 'View';
+  viewBtn.addEventListener('click', () => openSubmissionDetail(sub));
+  detailsTd.appendChild(viewBtn);
+
+  tr.appendChild(dateTd);
+  tr.appendChild(businessTd);
+  tr.appendChild(contactTd);
+  tr.appendChild(agentTd);
+  tr.appendChild(phoneTd);
+  tr.appendChild(custTd);
+  tr.appendChild(statusTd);
+  tr.appendChild(detailsTd);
+  return tr;
+}
+
+// ===== Pagination =====
+function renderSubmissionsPagination(totalCount) {
+  const pager = document.getElementById('submissions-pagination');
+  const totalPages = Math.ceil(totalCount / SUBMISSIONS_PAGE_SIZE);
+
+  if (totalPages <= 1) {
+    pager.innerHTML = '';
+    return;
+  }
+
+  pager.innerHTML = '';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.textContent = 'Previous';
+  prevBtn.disabled = submissionsPage === 0;
+  prevBtn.addEventListener('click', () => {
+    submissionsPage -= 1;
+    loadSubmissions();
+  });
+  pager.appendChild(prevBtn);
+
+  const pageLabel = document.createElement('button');
+  pageLabel.textContent = `Page ${submissionsPage + 1} of ${totalPages}`;
+  pageLabel.className = 'current';
+  pageLabel.disabled = true;
+  pager.appendChild(pageLabel);
+
+  const nextBtn = document.createElement('button');
+  nextBtn.textContent = 'Next';
+  nextBtn.disabled = submissionsPage >= totalPages - 1;
+  nextBtn.addEventListener('click', () => {
+    submissionsPage += 1;
+    loadSubmissions();
+  });
+  pager.appendChild(nextBtn);
+}
+
+// ===== Submission detail modal =====
+const submissionDetailOverlay = document.getElementById('submission-detail-overlay');
+const submissionDetailContent = document.getElementById('submission-detail-content');
+document.getElementById('submission-detail-close-btn').addEventListener('click', closeSubmissionDetail);
+submissionDetailOverlay.addEventListener('click', (e) => {
+  if (e.target === submissionDetailOverlay) closeSubmissionDetail();
+});
+
+function closeSubmissionDetail() {
+  submissionDetailOverlay.hidden = true;
+}
+
+async function openSubmissionDetail(sub) {
+  submissionDetailContent.innerHTML = '<p style="padding:16px; color:var(--color-text-muted)">Loading...</p>';
+  submissionDetailOverlay.hidden = false;
+
+  // Fetch fresh data for this specific submission rather than relying on the
+  // cached row from when the table last loaded — ensures photo, geolocation,
+  // and brand joins are always current, regardless of when the table was last
+  // refreshed or whether schema cache has been reloaded since.
+  const { data: freshSub, error } = await supabaseClient
+    .from('submissions')
+    .select(`
+      id, submission_ref, contact_name, business_name, business_address,
+      phone_number, years_in_business, customers_per_day, notes, status,
+      submitted_at, created_at,
+      users:user_id ( id, name, email ),
+      photos ( id, file_path, file_size_bytes, mime_type ),
+      geolocations ( latitude, longitude, accuracy_meters, captured_at ),
+      submission_brands ( rank, brands ( name ) )
+    `)
+    .eq('id', sub.id)
+    .single();
+
+  if (error || !freshSub) {
+    submissionDetailContent.innerHTML = `<p style="padding:16px; color:var(--color-error)">Could not load submission details.</p>`;
+    return;
+  }
+
+  // Use the freshly-fetched row from here on.
+  sub = freshSub;
+
+  submissionDetailContent.innerHTML = '';
+
+  // Business details section
+  const bizSection = document.createElement('div');
+  bizSection.className = 'detail-section';
+  bizSection.innerHTML = '<h3>Business details</h3>';
+  [
+    ['Submission ref', sub.submission_ref],
+    ['Business name', sub.business_name],
+    ['Contact name', sub.contact_name],
+    ['Address', sub.business_address],
+    ['Phone', sub.phone_number],
+    ['Years in business', sub.years_in_business],
+    ['Customers/day', sub.customers_per_day],
+    ['Field user', sub.users ? (sub.users.name || sub.users.email) : 'Unknown'],
+    ['Submitted', sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : '—'],
+    ['Status', sub.status]
+  ].forEach(([label, value]) => bizSection.appendChild(buildDetailRow(label, value)));
+  if (sub.notes) {
+    bizSection.appendChild(buildDetailRow('Notes', sub.notes));
+  }
+  submissionDetailContent.appendChild(bizSection);
+
+  // Brands section
+  const brandsSection = document.createElement('div');
+  brandsSection.className = 'detail-section';
+  brandsSection.innerHTML = '<h3>Brands serviced</h3>';
+  const brandEntries = Array.isArray(sub.submission_brands) && sub.submission_brands.length > 0
+    ? sub.submission_brands
+        .sort((a, b) => a.rank - b.rank)
+        .map(sb => sb.brands ? sb.brands.name : '—')
+    : null;
+  if (brandEntries) {
+    brandEntries.forEach((name, idx) => {
+      brandsSection.appendChild(buildDetailRow(`Brand ${idx + 1}`, name));
+    });
+  } else {
+    const note = document.createElement('p');
+    note.className = 'detail-no-location';
+    note.textContent = 'No brands recorded for this submission.';
+    brandsSection.appendChild(note);
+  }
+  submissionDetailContent.appendChild(brandsSection);
+
+  // Photo section
+  const photoSection = document.createElement('div');
+  photoSection.className = 'detail-section';
+  photoSection.innerHTML = '<h3>Photo</h3>';
+  const photo = sub.photos && sub.photos[0];
+  if (photo) {
+    const { data: signedUrlData } = await supabaseClient.storage
+      .from('submission-photos')
+      .createSignedUrl(photo.file_path, 300);
+
+    if (signedUrlData && signedUrlData.signedUrl) {
+      const img = document.createElement('img');
+      img.className = 'detail-photo';
+      img.src = signedUrlData.signedUrl;
+      img.alt = `Photo for ${sub.business_name}`;
+      photoSection.appendChild(img);
+    } else {
+      const note = document.createElement('p');
+      note.className = 'detail-no-photo';
+      note.textContent = 'Photo on file, but could not load preview.';
+      photoSection.appendChild(note);
+    }
+  } else {
+    const note = document.createElement('p');
+    note.className = 'detail-no-photo';
+    note.textContent = 'No photo recorded for this submission.';
+    photoSection.appendChild(note);
+  }
+  submissionDetailContent.appendChild(photoSection);
+
+  // Geolocation section
+  const geoSection = document.createElement('div');
+  geoSection.className = 'detail-section';
+  geoSection.innerHTML = '<h3>Geolocation</h3>';
+  // geolocations is returned as a plain object (not an array) because
+  // submission_id has a unique constraint, so PostgREST treats this as
+  // a one-to-one relationship.
+  const geo = sub.geolocations && typeof sub.geolocations === 'object' && !Array.isArray(sub.geolocations)
+    ? sub.geolocations
+    : (Array.isArray(sub.geolocations) ? sub.geolocations[0] : null);
+  if (geo) {
+    [
+      ['Latitude', geo.latitude],
+      ['Longitude', geo.longitude],
+      ['Accuracy', `±${Math.round(geo.accuracy_meters || 0)}m`],
+      ['Captured', new Date(geo.captured_at).toLocaleString()]
+    ].forEach(([label, value]) => geoSection.appendChild(buildDetailRow(label, value)));
+  } else {
+    const note = document.createElement('p');
+    note.className = 'detail-no-location';
+    note.textContent = 'No location recorded for this submission.';
+    geoSection.appendChild(note);
+  }
+  submissionDetailContent.appendChild(geoSection);
+}
+
+function buildDetailRow(label, value) {
+  const row = document.createElement('div');
+  row.className = 'detail-row';
+  const labelEl = document.createElement('span');
+  labelEl.className = 'detail-row-label';
+  labelEl.textContent = label;
+  const valueEl = document.createElement('span');
+  valueEl.className = 'detail-row-value';
+  valueEl.textContent = (value === null || value === undefined || value === '') ? '—' : value;
+  row.appendChild(labelEl);
+  row.appendChild(valueEl);
+  return row;
+}
+
+// ===== CSV export =====
+document.getElementById('submissions-export-btn').addEventListener('click', exportSubmissionsCsv);
+
+async function exportSubmissionsCsv() {
+  const btn = document.getElementById('submissions-export-btn');
+  btn.disabled = true;
+  btn.textContent = 'Exporting...';
+  setSubmissionsMessage('', null);
+
+  try {
+    // Export respects whatever filters are currently applied, and pulls
+    // every matching row (not just the current page) by querying without
+    // the range() limit.
+    const { data, error } = await buildSubmissionsQuery(lastSubmissionsFilters, { forExport: true });
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      setSubmissionsMessage('No submissions to export with the current filters.', 'error');
+      return;
+    }
+
+    const headers = [
+      'Submission Ref', 'Business Name', 'Contact Name', 'Business Address',
+      'Phone Number', 'Years In Business', 'Customers Per Day', 'Notes',
+      'Field User Name', 'Field User Email', 'Status', 'Submitted At', 'Created At',
+      'Brands Serviced', 'Photo File Path', 'Photo Size Bytes', 'Latitude', 'Longitude',
+      'Location Accuracy (m)', 'Location Captured At'
+    ];
+
+    const rows = data.map(sub => {
+      const photo = Array.isArray(sub.photos) ? sub.photos[0] : sub.photos;
+      const geo = sub.geolocations && !Array.isArray(sub.geolocations)
+        ? sub.geolocations
+        : (Array.isArray(sub.geolocations) ? sub.geolocations[0] : null);
+      const brands = Array.isArray(sub.submission_brands) && sub.submission_brands.length > 0
+        ? sub.submission_brands
+            .sort((a, b) => a.rank - b.rank)
+            .map(sb => sb.brands ? sb.brands.name : '')
+            .filter(Boolean)
+            .join('; ')
+        : '';
+      return [
+        sub.submission_ref, sub.business_name, sub.contact_name, sub.business_address,
+        sub.phone_number, sub.years_in_business, sub.customers_per_day, sub.notes || '',
+        sub.users ? (sub.users.name || '') : '', sub.users ? (sub.users.email || '') : '',
+        sub.status, sub.submitted_at || '', sub.created_at,
+        brands,
+        photo ? photo.file_path : '', photo ? photo.file_size_bytes : '',
+        geo ? geo.latitude : '', geo ? geo.longitude : '',
+        geo ? geo.accuracy_meters : '', geo ? geo.captured_at : ''
+      ];
+    });
+
+    const csv = buildCsv(headers, rows);
+    downloadCsv(csv, `bmc-submissions-${new Date().toISOString().slice(0, 10)}.csv`);
+
+    setSubmissionsMessage(`Exported ${data.length} submission${data.length === 1 ? '' : 's'}.`, 'success');
+  } catch (err) {
+    setSubmissionsMessage('Export failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Export CSV';
+  }
+}
+
+// Escapes a single CSV field: wraps in quotes if it contains a comma,
+// quote, or newline, and doubles any internal quotes per RFC 4180.
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function buildCsv(headers, rows) {
+  const lines = [headers.map(csvEscape).join(',')];
+  rows.forEach(row => lines.push(row.map(csvEscape).join(',')));
+  return lines.join('\r\n');
+}
+
+function downloadCsv(csvContent, filename) {
+  // Leading BOM so Excel correctly detects UTF-8 rather than misreading
+  // accented characters in business/contact names.
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// ===== Brands panel =====
+function setBrandsMessage(message, type) {
+  const el = document.getElementById('brands-message');
+  el.textContent = message;
+  el.className = 'panel-message' + (type ? ' ' + type : '');
+}
+
+async function loadBrandsPanel() {
+  const tbody = document.getElementById('brands-table-body');
+  tbody.innerHTML = '<tr><td colspan="4" class="table-loading">Loading brands...</td></tr>';
+
+  const { data, error } = await supabaseClient
+    .from('brands')
+    .select('id, name, active, created_at')
+    .order('name');
+
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Could not load brands.</td></tr>';
+    setBrandsMessage('Could not load brands: ' + error.message, 'error');
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No brands yet. Add one above.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.forEach(brand => tbody.appendChild(buildBrandRow(brand)));
+}
+
+function buildBrandRow(brand) {
+  const tr = document.createElement('tr');
+
+  const nameTd = document.createElement('td');
+  nameTd.setAttribute('data-label', 'Name');
+  nameTd.textContent = brand.name;
+
+  const statusTd = document.createElement('td');
+  statusTd.setAttribute('data-label', 'Status');
+  const badge = document.createElement('span');
+  badge.className = `badge ${brand.active ? 'status-active' : 'status-inactive'}`;
+  badge.textContent = brand.active ? 'Active' : 'Inactive';
+  statusTd.appendChild(badge);
+
+  const addedTd = document.createElement('td');
+  addedTd.setAttribute('data-label', 'Added');
+  addedTd.textContent = brand.created_at ? new Date(brand.created_at).toLocaleDateString() : '—';
+
+  const actionsTd = document.createElement('td');
+  actionsTd.setAttribute('data-label', 'Actions');
+  const actionBtn = document.createElement('button');
+  actionBtn.type = 'button';
+  actionBtn.className = `btn-sm ${brand.active ? 'deactivate' : 'activate'}`;
+  actionBtn.textContent = brand.active ? 'Deactivate' : 'Reactivate';
+  actionBtn.addEventListener('click', () => toggleBrandActive(brand));
+  actionsTd.appendChild(actionBtn);
+
+  tr.appendChild(nameTd);
+  tr.appendChild(statusTd);
+  tr.appendChild(addedTd);
+  tr.appendChild(actionsTd);
+  return tr;
+}
+
+document.getElementById('add-brand-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('new-brand-name');
+  const name = input.value.trim();
+  if (!name) return;
+
+  setBrandsMessage('', null);
+
+  // Friendly client-side duplicate check before hitting the DB's unique
+  // constraint, so the error message is clearer than a raw constraint violation.
+  const { data: existing } = await supabaseClient
+    .from('brands')
+    .select('id, active')
+    .ilike('name', name)
+    .maybeSingle();
+
+  if (existing) {
+    setBrandsMessage(
+      existing.active
+        ? `"${name}" already exists in the brand list.`
+        : `"${name}" already exists but is inactive. Reactivate it from the list below instead of adding a duplicate.`,
+      'error'
+    );
+    return;
+  }
+
+  const { error } = await supabaseClient.from('brands').insert({ name, active: true });
+
+  if (error) {
+    setBrandsMessage('Could not add brand: ' + error.message, 'error');
+    return;
+  }
+
+  input.value = '';
+  setBrandsMessage(`"${name}" added.`, 'success');
+  await loadBrandsPanel();
+});
+
+async function toggleBrandActive(brand) {
+  const newState = !brand.active;
+  const confirmed = await askConfirm(
+    newState
+      ? `Reactivate "${brand.name}"? It will appear again in the brand list for new submissions.`
+      : `Deactivate "${brand.name}"? It will no longer appear for new submissions, but past records referencing it are unaffected.`
+  );
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient
+    .from('brands')
+    .update({ active: newState })
+    .eq('id', brand.id);
+
+  if (error) {
+    setBrandsMessage('Could not update brand: ' + error.message, 'error');
+    return;
+  }
+
+  setBrandsMessage(`"${brand.name}" ${newState ? 'reactivated' : 'deactivated'}.`, 'success');
+  await loadBrandsPanel();
 }
 
 // ===== Init =====

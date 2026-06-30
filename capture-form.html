@@ -72,25 +72,27 @@
     <!-- Brands -->
     <section class="form-section">
       <h2 class="section-title">Top 3 brands serviced</h2>
-      <p class="section-hint">Enter up to three. Only the first is required.</p>
+      <p class="section-hint">Choose up to three. Only the first is required.</p>
 
-      <!--
-        Simplified to plain text inputs for now instead of a dropdown/checkbox
-        list against the brands table. Revisit once the brand list UX is decided.
-      -->
       <div class="field">
         <label for="brand-1">Brand 1 <span class="req">*</span></label>
-        <input type="text" id="brand-1" name="brand_1" required>
+        <select id="brand-1" name="brand_1" required>
+          <option value="">Select a brand</option>
+        </select>
       </div>
 
       <div class="field">
         <label for="brand-2">Brand 2</label>
-        <input type="text" id="brand-2" name="brand_2">
+        <select id="brand-2" name="brand_2">
+          <option value="">Select a brand</option>
+        </select>
       </div>
 
       <div class="field">
         <label for="brand-3">Brand 3</label>
-        <input type="text" id="brand-3" name="brand_3">
+        <select id="brand-3" name="brand_3">
+          <option value="">Select a brand</option>
+        </select>
       </div>
       <p class="field-error" id="brands-error"></p>
     </section>

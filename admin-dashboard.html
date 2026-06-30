@@ -27,6 +27,7 @@
   <nav class="tab-nav" role="tablist">
     <button class="tab-btn active" data-tab="users" role="tab">Users</button>
     <button class="tab-btn" data-tab="submissions" role="tab">Submissions</button>
+    <button class="tab-btn" data-tab="brands" role="tab">Brands</button>
     <button class="tab-btn" data-tab="map" role="tab">Map</button>
     <button class="tab-btn" data-tab="audit" role="tab">Audit Log</button>
   </nav>
@@ -75,10 +76,87 @@
 
   <!-- ================= SUBMISSIONS TAB ================= -->
   <section class="tab-panel" id="panel-submissions">
+
     <div class="panel-header">
       <h1>Submissions</h1>
+      <div class="panel-header-actions">
+        <button id="submissions-export-btn" class="icon-btn" type="button">Export CSV</button>
+      </div>
     </div>
-    <p class="placeholder-note">Submissions search, filtering, and export will be built next.</p>
+
+    <div class="filter-bar">
+      <input type="text" id="sub-filter-business" class="text-input" placeholder="Business name">
+      <input type="text" id="sub-filter-location" class="text-input" placeholder="Location / address">
+      <select id="sub-filter-agent" class="select-input">
+        <option value="">All field users</option>
+      </select>
+      <input type="text" id="sub-filter-brand" class="text-input" placeholder="Brand serviced">
+      <input type="date" id="sub-filter-from" class="text-input" aria-label="From date">
+      <input type="date" id="sub-filter-to" class="text-input" aria-label="To date">
+      <input type="number" id="sub-filter-cust-min" class="text-input" placeholder="Min customers/day" min="0">
+      <input type="number" id="sub-filter-cust-max" class="text-input" placeholder="Max customers/day" min="0">
+      <button id="sub-filter-apply-btn" class="btn-sm" type="button">Apply filters</button>
+      <button id="sub-filter-clear-btn" class="icon-btn" type="button">Clear</button>
+    </div>
+
+    <p id="submissions-message" class="panel-message" role="alert"></p>
+
+    <div class="table-wrap">
+      <table class="data-table" id="submissions-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Business</th>
+            <th>Contact</th>
+            <th>Field user</th>
+            <th>Phone</th>
+            <th>Customers/day</th>
+            <th>Status</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="submissions-table-body">
+          <tr><td colspan="8" class="table-loading">Loading submissions...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="submissions-pagination"></div>
+
+  </section>
+
+  <!-- ================= BRANDS TAB ================= -->
+  <section class="tab-panel" id="panel-brands">
+
+    <div class="panel-header">
+      <h1>Brands</h1>
+    </div>
+
+    <p class="panel-sub-note">Manage the brand list field agents choose from when capturing a visit. Deactivating a brand hides it from new submissions without affecting past records.</p>
+
+    <form id="add-brand-form" class="add-brand-form">
+      <input type="text" id="new-brand-name" class="text-input" placeholder="New brand name" required>
+      <button type="submit" class="btn-primary-sm">Add brand</button>
+    </form>
+
+    <p id="brands-message" class="panel-message" role="alert"></p>
+
+    <div class="table-wrap">
+      <table class="data-table" id="brands-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Added</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="brands-table-body">
+          <tr><td colspan="4" class="table-loading">Loading brands...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
   </section>
 
   <!-- ================= MAP TAB ================= -->
@@ -164,6 +242,17 @@
       <button id="audit-detail-close-btn" class="drafts-close-btn" type="button" aria-label="Close">&times;</button>
     </div>
     <div id="audit-detail-content"></div>
+  </div>
+</div>
+
+<!-- Submission detail modal -->
+<div id="submission-detail-overlay" class="confirm-overlay" hidden>
+  <div class="confirm-box submission-detail-box">
+    <div class="confirm-box-header">
+      <h2>Submission detail</h2>
+      <button id="submission-detail-close-btn" class="drafts-close-btn" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div id="submission-detail-content"></div>
   </div>
 </div>
 
