@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BMC Field Data Capture — Admin Dashboard</title>
 <link rel="stylesheet" href="admin-dashboard.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -84,16 +85,62 @@
   <section class="tab-panel" id="panel-map">
     <div class="panel-header">
       <h1>Map</h1>
+      <div class="panel-header-actions">
+        <input type="date" id="map-filter-from" class="text-input" aria-label="From date">
+        <input type="date" id="map-filter-to" class="text-input" aria-label="To date">
+        <button id="map-clear-btn" class="icon-btn" type="button">Clear filters</button>
+        <button id="map-refresh-btn" class="icon-btn" type="button">Refresh</button>
+      </div>
     </div>
-    <p class="placeholder-note">Map view of captured submission locations will be built next.</p>
+
+    <p id="map-message" class="panel-message" role="alert"></p>
+
+    <div id="map-container" class="map-container"></div>
+    <p class="map-count-note" id="map-count-note"></p>
   </section>
 
   <!-- ================= AUDIT LOG TAB ================= -->
   <section class="tab-panel" id="panel-audit">
+
     <div class="panel-header">
       <h1>Audit Log</h1>
+      <div class="panel-header-actions">
+        <select id="audit-filter-entity" class="select-input">
+          <option value="">All record types</option>
+          <option value="users">Users</option>
+          <option value="submissions">Submissions</option>
+        </select>
+        <select id="audit-filter-action" class="select-input">
+          <option value="">All actions</option>
+          <option value="create">Created</option>
+          <option value="update">Updated</option>
+          <option value="delete">Deleted</option>
+        </select>
+      </div>
     </div>
-    <p class="placeholder-note">Audit trail view will be built next.</p>
+
+    <p id="audit-message" class="panel-message" role="alert"></p>
+
+    <div class="table-wrap">
+      <table class="data-table" id="audit-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Changed by</th>
+            <th>Record type</th>
+            <th>Record ID</th>
+            <th>Action</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="audit-table-body">
+          <tr><td colspan="6" class="table-loading">Loading audit log...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="audit-pagination"></div>
+
   </section>
 
 </div>
@@ -109,7 +156,19 @@
   </div>
 </div>
 
+<!-- Audit entry details modal -->
+<div id="audit-detail-overlay" class="confirm-overlay" hidden>
+  <div class="confirm-box audit-detail-box">
+    <div class="confirm-box-header">
+      <h2>Change details</h2>
+      <button id="audit-detail-close-btn" class="drafts-close-btn" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div id="audit-detail-content"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="supabase-client.js"></script>
 <script src="admin-dashboard.js"></script>
 </body>
