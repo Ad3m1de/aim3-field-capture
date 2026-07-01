@@ -598,7 +598,7 @@ document.getElementById('capture-form').addEventListener('submit', async (e) => 
 
   // If offline, skip straight to local draft save — server checks happen at sync time.
   if (!navigator.onLine) {
-    await saveAsLocalDraft(formData, capturedPhotoFile);
+    await saveAsLocalDraft(formData, capturedPhotoFile, 'offline');
     setLoading(false);
     showSuccess('Saved offline. This will be submitted automatically once you\'re back online.');
     return;
@@ -626,7 +626,7 @@ document.getElementById('capture-form').addEventListener('submit', async (e) => 
   } catch (err) {
     setLoading(false);
     setFormMessage('Could not submit right now. Saving as a draft instead — it will sync automatically.', 'warning');
-    await saveAsLocalDraft(formData, capturedPhotoFile);
+    await saveAsLocalDraft(formData, capturedPhotoFile, 'offline');
   }
 });
 
@@ -635,14 +635,16 @@ document.getElementById('save-draft-btn').addEventListener('click', async () => 
   const formData = collectFormData();
   await saveAsLocalDraft(formData, capturedPhotoFile);
   await refreshDraftsBadge();
-  // Show a brief inline message but keep the form open — saving a draft
-  // is not the same as submitting, so the agent should be able to keep editing.
+
+  // Generate a fresh submission ref immediately after saving so the
+  // next draft (or submission) doesn't reuse the same ref.
+  document.getElementById('submission-ref').textContent = generateSubmissionRef();
+
   setFormMessage('Draft saved on this device.', 'success');
-  // Clear the message after 3 seconds so it doesn't linger.
   setTimeout(() => setFormMessage('', null), 3000);
 });
 
-async function saveAsLocalDraft(formData, photoFile) {
+async function saveAsLocalDraft(formData, photoFile, draftType = 'manual') {
   let photoDataUrl = null;
   if (photoFile) {
     photoDataUrl = await new Promise((resolve) => {
@@ -652,8 +654,6 @@ async function saveAsLocalDraft(formData, photoFile) {
     });
   }
 
-  // Reuse the existing draft's ID if we're editing one, so this updates
-  // it in place rather than creating a duplicate entry.
   const localId = editingDraftLocalId || `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   const draft = {
@@ -661,7 +661,10 @@ async function saveAsLocalDraft(formData, photoFile) {
     formData,
     photoDataUrl,
     photoType: photoFile ? photoFile.type : null,
-    savedAt: new Date().toISOString()
+    savedAt: new Date().toISOString(),
+    // 'offline' = was a real submit attempt while offline, should auto-sync
+    // 'manual'  = explicitly saved as draft, only syncs when user submits it
+    draftType
   };
 
   await saveDraftLocally(draft);
@@ -678,12 +681,16 @@ async function syncPendingDrafts() {
   }
   if (!drafts || drafts.length === 0) return;
 
-  for (const draft of drafts) {
+  // Only auto-sync drafts that were queued because the device was offline
+  // during a real submit attempt. Manual drafts (saved via "Save as draft"
+  // button) stay local until the agent explicitly edits and submits them.
+  const offlineDrafts = drafts.filter(d => d.draftType === 'offline');
+  if (offlineDrafts.length === 0) return;
+
+  for (const draft of offlineDrafts) {
     try {
       const dupCheck = await checkForDuplicate(draft.formData);
       if (dupCheck.checked && dupCheck.isDuplicate) {
-        // Leave it queued; a real build would surface this to the user for review
-        // rather than silently dropping it.
         continue;
       }
 
@@ -697,7 +704,6 @@ async function syncPendingDrafts() {
       await uploadPhotoAndSubmit(draft.formData, photoFile);
       await deleteLocalDraft(draft.localId);
     } catch (err) {
-      // Leave this draft queued and try again on the next sync opportunity.
       continue;
     }
   }
