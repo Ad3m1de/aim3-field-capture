@@ -297,7 +297,6 @@ photoInput.addEventListener('change', async (e) => {
 
   setFieldError('photo-input', 'photo-error', '');
 
-  // File size guard — keep photos reasonably small (matches DB constraint of 10MB max).
   const MAX_BYTES = 10 * 1024 * 1024;
   if (file.size > MAX_BYTES) {
     setFieldError('photo-input', 'photo-error', 'Photo is too large. Please use a smaller image (max 10MB).');
@@ -315,13 +314,39 @@ photoInput.addEventListener('change', async (e) => {
   };
   reader.readAsDataURL(file);
 
-  // Capture geolocation at the same moment, as the brief requires.
-  captureLocation();
+  // Try EXIF GPS first — this reflects where the photo was actually taken,
+  // not where the device is now at upload time, which is the more meaningful
+  // location for field visit data.
+  await captureLocation(file);
 });
 
-function captureLocation() {
+async function captureLocation(photoFile) {
   locationDot.className = 'location-dot';
-  locationText.textContent = 'Capturing location...';
+  locationText.textContent = 'Reading location from photo...';
+
+  // Step 1: Try EXIF GPS data embedded in the photo.
+  try {
+    if (typeof exifr !== 'undefined') {
+      const gps = await exifr.gps(photoFile);
+      if (gps && gps.latitude && gps.longitude) {
+        capturedLocation = {
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          accuracy: null, // EXIF doesn't include accuracy
+          capturedAt: new Date().toISOString(),
+          source: 'exif'
+        };
+        locationDot.className = 'location-dot captured';
+        locationText.textContent = 'Location read from photo metadata.';
+        return;
+      }
+    }
+  } catch (err) {
+    // EXIF parsing failed or no GPS data — fall through to device geolocation.
+  }
+
+  // Step 2: Fall back to device geolocation if EXIF has no GPS data.
+  locationText.textContent = 'No GPS in photo — capturing device location...';
 
   if (!('geolocation' in navigator)) {
     locationDot.className = 'location-dot error';
@@ -336,10 +361,11 @@ function captureLocation() {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
-        capturedAt: new Date().toISOString()
+        capturedAt: new Date().toISOString(),
+        source: 'device'
       };
       locationDot.className = 'location-dot captured';
-      locationText.textContent = `Location captured (±${Math.round(position.coords.accuracy)}m accuracy)`;
+      locationText.textContent = `Device location captured (±${Math.round(position.coords.accuracy)}m). Note: reflects upload location, not where photo was taken.`;
     },
     (err) => {
       capturedLocation = null;
@@ -606,10 +632,14 @@ document.getElementById('capture-form').addEventListener('submit', async (e) => 
 
 // ===== Save as draft button =====
 document.getElementById('save-draft-btn').addEventListener('click', async () => {
-  // Drafts don't require full validation — just need the basics to be useful later.
   const formData = collectFormData();
   await saveAsLocalDraft(formData, capturedPhotoFile);
-  showSuccess('Draft saved on this device. You can finish it later from here.');
+  await refreshDraftsBadge();
+  // Show a brief inline message but keep the form open — saving a draft
+  // is not the same as submitting, so the agent should be able to keep editing.
+  setFormMessage('Draft saved on this device.', 'success');
+  // Clear the message after 3 seconds so it doesn't linger.
+  setTimeout(() => setFormMessage('', null), 3000);
 });
 
 async function saveAsLocalDraft(formData, photoFile) {
@@ -689,9 +719,40 @@ function showSuccess(message) {
   document.getElementById('success-detail').textContent = message;
 }
 
-document.getElementById('new-submission-btn').addEventListener('click', () => {
-  window.location.reload();
-});
+function resetForm() {
+  // Reset all form fields
+  document.getElementById('capture-form').reset();
+
+  // Generate a fresh submission reference
+  document.getElementById('submission-ref').textContent = generateSubmissionRef();
+
+  // Clear in-memory state
+  capturedPhotoFile = null;
+  capturedLocation = null;
+  editingDraftLocalId = null;
+
+  // Reset photo preview
+  document.getElementById('photo-preview-wrap').hidden = true;
+  document.getElementById('photo-preview').src = '';
+
+  // Reset location indicator
+  document.getElementById('location-dot').className = 'location-dot';
+  document.getElementById('location-text').textContent = 'Location will be captured with your photo';
+
+  // Clear any lingering messages and validation states
+  setFormMessage('', null);
+  document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+  document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+
+  // Show the form, hide the success screen
+  document.getElementById('success-screen').hidden = true;
+  document.getElementById('capture-form').hidden = false;
+
+  // Scroll back to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('new-submission-btn').addEventListener('click', resetForm);
 
 // ===== Init =====
 checkAuth();

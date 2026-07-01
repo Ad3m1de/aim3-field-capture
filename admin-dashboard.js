@@ -594,7 +594,15 @@ function initLeafletMap() {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(leafletMap);
-  markersLayer = L.layerGroup().addTo(leafletMap);
+  // MarkerClusterGroup groups overlapping markers into a numbered badge
+  // rather than stacking them invisibly. Clicking zooms in; at max zoom
+  // it spiderfies markers outward so each one is individually clickable.
+  markersLayer = L.markerClusterGroup({
+    maxClusterRadius: 40,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false
+  });
+  leafletMap.addLayer(markersLayer);
   mapInitialized = true;
 }
 
