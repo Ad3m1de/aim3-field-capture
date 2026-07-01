@@ -636,12 +636,23 @@ document.getElementById('save-draft-btn').addEventListener('click', async () => 
   await saveAsLocalDraft(formData, capturedPhotoFile);
   await refreshDraftsBadge();
 
-  // Generate a fresh submission ref immediately after saving so the
-  // next draft (or submission) doesn't reuse the same ref.
+  // Reset the form completely so the agent can start a fresh visit —
+  // same as after a real submission, but without showing the success screen.
+  document.getElementById('capture-form').reset();
   document.getElementById('submission-ref').textContent = generateSubmissionRef();
+  capturedPhotoFile = null;
+  capturedLocation = null;
+  editingDraftLocalId = null;
+  document.getElementById('photo-preview-wrap').hidden = true;
+  document.getElementById('photo-preview').src = '';
+  document.getElementById('location-dot').className = 'location-dot';
+  document.getElementById('location-text').textContent = 'Location will be captured with your photo';
+  document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+  document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
 
-  setFormMessage('Draft saved on this device.', 'success');
-  setTimeout(() => setFormMessage('', null), 3000);
+  setFormMessage('Draft saved. You can access it from the Drafts button above.', 'success');
+  setTimeout(() => setFormMessage('', null), 4000);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 async function saveAsLocalDraft(formData, photoFile, draftType = 'manual') {
