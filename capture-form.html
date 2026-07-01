@@ -99,11 +99,18 @@
 
     <!-- Photo + location -->
     <section class="form-section">
-      <h2 class="section-title">Photo</h2>
+      <h2 class="section-title">Photo &amp; Location</h2>
+
+      <div class="location-notice">
+        <span class="location-notice-icon">📍</span>
+        <p>Your device will ask for <strong>location permission</strong> when you take or upload a photo. Please tap <strong>Allow</strong> so your visit location can be recorded automatically. If you have previously denied location access, you may need to enable it in your device settings.</p>
+      </div>
 
       <div class="field">
         <label for="photo-input">Take or upload a photo <span class="req">*</span></label>
-        <input type="file" id="photo-input" accept="image/*" capture="environment" required>
+        <!-- accept="image/*" without capture="environment" allows both camera
+             and gallery on mobile, matching the brief's "take or upload" requirement. -->
+        <input type="file" id="photo-input" accept="image/*" required>
         <div id="photo-preview-wrap" class="photo-preview-wrap" hidden>
           <img id="photo-preview" alt="Captured photo preview">
         </div>

@@ -122,6 +122,24 @@ loginForm.addEventListener('submit', async (e) => {
   window.location.href = profile.role === 'admin' ? 'admin-dashboard.html' : 'capture-form.html';
 });
 
+// --- Privacy notice modal ---
+const privacyOverlay = document.getElementById('privacy-overlay');
+document.getElementById('privacy-notice-btn').addEventListener('click', () => {
+  privacyOverlay.hidden = false;
+});
+document.getElementById('privacy-close-btn').addEventListener('click', () => {
+  privacyOverlay.hidden = true;
+});
+document.getElementById('privacy-accept-btn').addEventListener('click', () => {
+  privacyOverlay.hidden = true;
+  // Tick the consent checkbox when the user explicitly closes via "I understand"
+  document.getElementById('signup-consent').checked = true;
+  setFieldError('signup-consent', 'signup-consent-error', '');
+});
+privacyOverlay.addEventListener('click', (e) => {
+  if (e.target === privacyOverlay) privacyOverlay.hidden = true;
+});
+
 // --- Sign up ---
 signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -129,10 +147,12 @@ signupForm.addEventListener('submit', async (e) => {
   const name = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
+  const consent = document.getElementById('signup-consent').checked;
 
   setFieldError('signup-name', 'signup-name-error', '');
   setFieldError('signup-email', 'signup-email-error', '');
   setFieldError('signup-password', 'signup-password-error', '');
+  setFieldError('signup-consent', 'signup-consent-error', '');
   setFormMessage('signup-message', '', null);
 
   let hasError = false;
@@ -152,6 +172,10 @@ signupForm.addEventListener('submit', async (e) => {
     hasError = true;
   } else if (password.length < 8) {
     setFieldError('signup-password', 'signup-password-error', 'Password must be at least 8 characters.');
+    hasError = true;
+  }
+  if (!consent) {
+    setFieldError('signup-consent', 'signup-consent-error', 'You must read and agree to the Privacy Notice to create an account.');
     hasError = true;
   }
   if (hasError) return;

@@ -9,6 +9,12 @@
 <body>
 
 <main class="auth-screen">
+
+  <div class="auth-side">
+    <h1>Capture field visits accurately, wherever you are.</h1>
+    <p>Log business details, attach a photo, and record your location automatically — even offline. Submissions sync as soon as you're back online.</p>
+  </div>
+
   <div class="auth-card">
 
     <div class="brand">
@@ -63,6 +69,14 @@
         <p class="field-error" id="signup-password-error"></p>
       </div>
 
+      <div class="field consent-field">
+        <label class="consent-label">
+          <input type="checkbox" id="signup-consent" required>
+          <span>I have read and agree to the <button type="button" class="link-btn" id="privacy-notice-btn">Privacy Notice</button>. I understand that BMC will collect and process my personal data, business visit data, and location data as described.</span>
+        </label>
+        <p class="field-error" id="signup-consent-error"></p>
+      </div>
+
       <p class="form-message" id="signup-message" role="alert"></p>
 
       <button type="submit" class="btn-primary" id="signup-submit">
@@ -75,6 +89,52 @@
 
   </div>
 </main>
+
+<!-- Privacy notice modal -->
+<div id="privacy-overlay" class="privacy-overlay" hidden>
+  <div class="privacy-box">
+    <div class="privacy-header">
+      <h2>Privacy Notice</h2>
+      <button id="privacy-close-btn" class="privacy-close-btn" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="privacy-content">
+
+      <p class="privacy-updated">Last updated: June 2026</p>
+
+      <h3>Who we are</h3>
+      <p>This application is operated by BMC ("we", "us", "our") for the purpose of collecting structured field visit data from authorised field agents.</p>
+
+      <h3>What data we collect</h3>
+      <p>When you use this application, we collect:</p>
+      <ul>
+        <li><strong>Account data</strong> — your name and email address when you register</li>
+        <li><strong>Business visit data</strong> — contact names, business names, addresses, phone numbers, and other details you record during a visit</li>
+        <li><strong>Location data</strong> — GPS coordinates (latitude, longitude, accuracy) captured automatically at the time of photo capture, subject to your device granting location permission. You will be prompted to allow location access when taking or uploading a photo — selecting <strong>Allow</strong> enables your visit location to be recorded. If denied, the submission will still be accepted but without location data.</li>
+        <li><strong>Photos</strong> — images you take or upload during a visit, stored securely and linked to your submission</li>
+        <li><strong>Usage data</strong> — records of submissions made, including timestamps and your user identity, retained in an audit trail</li>
+      </ul>
+
+      <h3>Why we collect it</h3>
+      <p>Data is collected solely for the purpose of recording and reporting on business visits made by field agents on behalf of BMC's clients. It is not used for marketing, profiling, or any purpose beyond this.</p>
+
+      <h3>How we store and protect it</h3>
+      <p>All data is stored in a secure, encrypted database hosted on Supabase. Data is transmitted over HTTPS only. Photos are stored in a private, access-controlled storage bucket. Access is restricted by role — field agents can only access their own submissions; administrators can access all submissions within the system.</p>
+
+      <h3>How long we keep it</h3>
+      <p>Data is retained for the duration of the project engagement. On completion, all data will be exported and handed over to the client, after which it will be deleted from our systems.</p>
+
+      <h3>Your rights</h3>
+      <p>You have the right to access the personal data held about you, request correction of inaccurate data, and request deletion of your account and associated data. To exercise these rights, contact your system administrator.</p>
+
+      <h3>Contact</h3>
+      <p>If you have questions about how your data is handled, contact your BMC project administrator.</p>
+
+    </div>
+    <div class="privacy-footer">
+      <button id="privacy-accept-btn" class="btn-primary" type="button" style="min-height:44px; font-size:15px;">I understand — close</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>

@@ -663,6 +663,87 @@ body {
   flex: 0 0 auto;
 }
 
+/* Submissions filter grid */
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-field label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.filter-field .text-input,
+.filter-field .select-input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.filters-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .filters-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .filters-grid {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .filter-field label {
+    font-size: 10px;
+  }
+
+  .filter-field .text-input,
+  .filter-field .select-input {
+    min-height: 36px;
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  /* Field user dropdown spans full width since it's a select
+     and needs more space to be readable */
+  .filter-field:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .filters-actions {
+    flex-wrap: wrap;
+  }
+
+  .filters-actions .btn-primary-sm,
+  .filters-actions .btn-secondary-sm {
+    flex: 1;
+    text-align: center;
+  }
+}
+
 /* Submission detail modal */
 .submission-detail-box {
   max-width: 640px;
@@ -728,10 +809,22 @@ body {
 @media (max-width: 480px) {
   .filter-bar {
     flex-direction: column;
+    gap: 6px;
+    padding: 10px;
   }
 
   .filter-bar .text-input,
   .filter-bar .select-input {
     width: 100%;
+    height: 42px;
+    min-height: 42px;
+    max-height: 42px;
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+
+  .filter-bar button {
+    width: 100%;
+    min-height: 40px;
   }
 }
