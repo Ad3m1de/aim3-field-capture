@@ -870,12 +870,23 @@ function buildSubmissionRow(sub) {
 
   const detailsTd = document.createElement('td');
   detailsTd.setAttribute('data-label', 'Details');
+
   const viewBtn = document.createElement('button');
   viewBtn.type = 'button';
   viewBtn.className = 'link-btn';
   viewBtn.textContent = 'View';
   viewBtn.addEventListener('click', () => openSubmissionDetail(sub));
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'link-btn';
+  deleteBtn.style.color = 'var(--color-error)';
+  deleteBtn.style.marginLeft = '10px';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.addEventListener('click', () => deleteSubmission(sub));
+
   detailsTd.appendChild(viewBtn);
+  detailsTd.appendChild(deleteBtn);
 
   tr.appendChild(dateTd);
   tr.appendChild(businessTd);
@@ -923,6 +934,27 @@ function renderSubmissionsPagination(totalCount) {
     loadSubmissions();
   });
   pager.appendChild(nextBtn);
+}
+
+async function deleteSubmission(sub) {
+  const confirmed = await askConfirm(
+    `Delete submission ${sub.submission_ref} (${sub.business_name})? This cannot be undone. The deletion will be recorded in the audit log.`
+  );
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient
+    .from('submissions')
+    .delete()
+    .eq('id', sub.id);
+
+  if (error) {
+    setSubmissionsMessage('Could not delete submission: ' + error.message, 'error');
+    return;
+  }
+
+  setSubmissionsMessage(`Submission ${sub.submission_ref} deleted.`, 'success');
+  // Reload the current filtered view so the deleted row disappears.
+  await loadSubmissions();
 }
 
 // ===== Submission detail modal =====
