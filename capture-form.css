@@ -392,6 +392,10 @@ body {
   display: none;
 }
 
+.field[hidden] {
+  display: none;
+}
+
 .drafts-panel {
   background: var(--color-surface);
   width: 100%;
