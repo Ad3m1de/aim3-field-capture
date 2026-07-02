@@ -755,7 +755,7 @@ async function buildSubmissionsQuery(filters, { forExport } = {}) {
   let query = supabaseClient
     .from('submissions')
     .select(`
-      id, submission_ref, contact_name, business_name, business_address,
+      id, submission_ref, contact_name, business_name, business_address, town, state,
       phone_number, years_in_business, customers_per_day, respondent_age,
       mechanic_count, land_ownership, region, previous_training, notes, status,
       submitted_at, created_at,
@@ -989,7 +989,7 @@ async function openSubmissionDetail(sub) {
   const { data: freshSub, error } = await supabaseClient
     .from('submissions')
     .select(`
-      id, submission_ref, contact_name, business_name, business_address,
+      id, submission_ref, contact_name, business_name, business_address, town, state, 
       phone_number, years_in_business, customers_per_day, respondent_age,
       mechanic_count, land_ownership, region, previous_training, notes, status,
       submitted_at, created_at,
@@ -1020,6 +1020,8 @@ async function openSubmissionDetail(sub) {
     ['Business name', sub.business_name],
     ['Contact name', sub.contact_name],
     ['Address', sub.business_address],
+    ['Town', sub.town],
+    ['State', sub.state],
     ['Phone', sub.phone_number],
     ['Years in business', sub.years_in_business],
     ['Customers/day', sub.customers_per_day],
@@ -1150,7 +1152,7 @@ async function exportSubmissionsCsv() {
     }
 
     const headers = [
-      'Submission Ref', 'Business Name', 'Contact Name', 'Business Address',
+      'Submission Ref', 'Business Name', 'Contact Name', 'Business Address', 'Town', 'State',
       'Phone Number', 'Years In Business', 'Customers Per Day',
       'Respondent Age', 'Mechanics In Workshop', 'Land Ownership', 'Region', 'Previous Training',
       'Notes', 'Field User Name', 'Field User Email', 'Status', 'Submitted At', 'Created At',
@@ -1171,7 +1173,7 @@ async function exportSubmissionsCsv() {
             .join('; ')
         : '';
       return [
-        sub.submission_ref, sub.business_name, sub.contact_name, sub.business_address,
+        sub.submission_ref, sub.business_name, sub.contact_name, sub.business_address, sub.town, sub.state,
         sub.phone_number, sub.years_in_business, sub.customers_per_day,
         sub.respondent_age ?? '', sub.mechanic_count ?? '',
         sub.land_ownership || '', sub.region || '', sub.previous_training || '',

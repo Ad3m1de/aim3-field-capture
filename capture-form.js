@@ -174,6 +174,8 @@ async function loadDraftIntoForm(draft) {
   document.getElementById('contact-name').value = fd.contact_name || '';
   document.getElementById('business-name').value = fd.business_name || '';
   document.getElementById('business-address').value = fd.business_address || '';
+  document.getElementById('town').value = fd.town || '';
+  document.getElementById('state').value = fd.state || '';
   document.getElementById('phone-number').value = fd.phone_number || '';
   document.getElementById('years-in-business').value = fd.years_in_business ?? '';
   document.getElementById('customers-per-day').value = fd.customers_per_day ?? '';
@@ -442,6 +444,8 @@ function validateForm() {
   const contactName = document.getElementById('contact-name').value.trim();
   const businessName = document.getElementById('business-name').value.trim();
   const businessAddress = document.getElementById('business-address').value.trim();
+  const town = document.getElementById('town').value.trim();
+  const state = document.getElementById('state').value.trim();  
   const phoneNumber = document.getElementById('phone-number').value.trim();
   const yearsInBusiness = document.getElementById('years-in-business').value;
   const customersPerDay = document.getElementById('customers-per-day').value;
@@ -466,6 +470,21 @@ function validateForm() {
     valid = false;
   } else {
     setFieldError('business-address', 'business-address-error', '');
+  }
+
+if (!town) {
+    setFieldError('town', 'town-error', 'Enter the town where your business is located.');
+    valid = false;
+  } else {
+    setFieldError('town', 'town-error', '');
+  }
+
+
+  if (!state) {
+    setFieldError('state', 'state-error', 'Enter the state where your business is located.');
+    valid = false;
+  } else {
+    setFieldError('state', 'state-error', '');
   }
 
   if (!phoneNumber) {
@@ -560,6 +579,8 @@ function collectFormData() {
     contact_name: document.getElementById('contact-name').value.trim(),
     business_name: document.getElementById('business-name').value.trim(),
     business_address: document.getElementById('business-address').value.trim(),
+    town: document.getElementById('town').value.trim(),
+    state: document.getElementById('state').value.trim(),
     phone_number: document.getElementById('phone-number').value.trim(),
     years_in_business: Number(document.getElementById('years-in-business').value),
     customers_per_day: Number(document.getElementById('customers-per-day').value),
