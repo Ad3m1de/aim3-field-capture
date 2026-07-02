@@ -92,6 +92,21 @@
       </div>
 
       <div class="field">
+        <label for="region">Region <span class="req">*</span></label>
+        <select id="region" name="region" required>
+          <option value="">Select Region</option>
+          <option value="East">East</option>
+          <option value="North-East">North-East</option>
+          <option value="North-Central">North-Central</option>
+          <option value="North-West">North-West</option>
+          <option value="Central">Central</option>
+          <option value="South">South</option>
+          <option value="West">West</option>
+        </select>
+        <p class="field-error" id="region-error"></p>
+      </div>
+
+      <div class="field">
         <label for="previous-training-toggle">Attended any other training previously?</label>
         <select id="previous-training-toggle" name="previous_training_toggle">
           <option value="no">No</option>

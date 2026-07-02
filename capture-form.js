@@ -180,6 +180,7 @@ async function loadDraftIntoForm(draft) {
   document.getElementById('respondent-age').value = fd.respondent_age ?? '';
   document.getElementById('mechanic-count').value = fd.mechanic_count ?? '';
   document.getElementById('land-ownership').value = fd.land_ownership || '';
+  document.getElementById('region').value = fd.region || '';
   document.getElementById('notes').value = fd.notes || '';
 
   // Restore previous training toggle
@@ -515,6 +516,13 @@ function validateForm() {
     setFieldError('land-ownership', 'land-ownership-error', '');
   }
 
+  const region = document.getElementById('region').value;
+  if (!region) {
+    setFieldError('region', 'region-error', 'Select a region.');
+    valid = false;
+  } else {
+    setFieldError('region', 'region-error', '');
+  }
   const trainingToggle = document.getElementById('previous-training-toggle').value;
   if (trainingToggle === 'yes') {
     const trainingText = document.getElementById('previous-training').value.trim();
@@ -527,7 +535,6 @@ function validateForm() {
   }
 
   if (!brand1) {
-    setFieldError('brand-error', 'brands-error', '');
     document.getElementById('brands-error').textContent = 'Select at least one brand.';
     valid = false;
   } else {
@@ -559,6 +566,7 @@ function collectFormData() {
     respondent_age: Number(document.getElementById('respondent-age').value),
     mechanic_count: Number(document.getElementById('mechanic-count').value),
     land_ownership: document.getElementById('land-ownership').value,
+    region: document.getElementById('region').value,
     previous_training: trainingText,
     notes: document.getElementById('notes').value.trim(),
     brand_ids: [

@@ -725,6 +725,7 @@ document.getElementById('sub-filter-clear-btn').addEventListener('click', () => 
   document.getElementById('sub-filter-location').value = '';
   document.getElementById('sub-filter-agent').value = '';
   document.getElementById('sub-filter-brand').value = '';
+  document.getElementById('sub-filter-region').value = '';
   document.getElementById('sub-filter-from').value = '';
   document.getElementById('sub-filter-to').value = '';
   document.getElementById('sub-filter-cust-min').value = '';
@@ -739,6 +740,7 @@ function readSubmissionsFilters() {
     location: document.getElementById('sub-filter-location').value.trim(),
     agentId: document.getElementById('sub-filter-agent').value,
     brand: document.getElementById('sub-filter-brand').value.trim(),
+    region: document.getElementById('sub-filter-region').value,
     fromDate: document.getElementById('sub-filter-from').value,
     toDate: document.getElementById('sub-filter-to').value,
     custMin: document.getElementById('sub-filter-cust-min').value,
@@ -755,7 +757,7 @@ async function buildSubmissionsQuery(filters, { forExport } = {}) {
     .select(`
       id, submission_ref, contact_name, business_name, business_address,
       phone_number, years_in_business, customers_per_day, respondent_age,
-      mechanic_count, land_ownership, previous_training, notes, status,
+      mechanic_count, land_ownership, region, previous_training, notes, status,
       submitted_at, created_at,
       users:user_id ( id, name, email ),
       photos ( id, file_path, file_size_bytes, mime_type ),
@@ -767,6 +769,7 @@ async function buildSubmissionsQuery(filters, { forExport } = {}) {
   if (filters.business) query = query.ilike('business_name', `%${filters.business}%`);
   if (filters.location) query = query.ilike('business_address', `%${filters.location}%`);
   if (filters.agentId) query = query.eq('user_id', filters.agentId);
+  if (filters.region) query = query.eq('region', filters.region);
   if (filters.fromDate) query = query.gte('created_at', `${filters.fromDate}T00:00:00`);
   if (filters.toDate) query = query.lte('created_at', `${filters.toDate}T23:59:59`);
   if (filters.custMin !== '') query = query.gte('customers_per_day', Number(filters.custMin));
@@ -810,7 +813,7 @@ async function buildSubmissionsQuery(filters, { forExport } = {}) {
 // ===== Load submissions (paginated table) =====
 async function loadSubmissions() {
   const tbody = document.getElementById('submissions-table-body');
-  tbody.innerHTML = '<tr><td colspan="8" class="table-loading">Loading submissions...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" class="table-loading">Loading submissions...</td></tr>';
   setSubmissionsMessage('', null);
 
   const filters = readSubmissionsFilters();
@@ -819,13 +822,13 @@ async function loadSubmissions() {
   const { data, error, count } = await buildSubmissionsQuery(filters);
 
   if (error) {
-    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">Could not load submissions.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="table-empty">Could not load submissions.</td></tr>';
     setSubmissionsMessage('Could not load submissions: ' + error.message, 'error');
     return;
   }
 
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No submissions match these filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No submissions match these filters.</td></tr>';
     renderSubmissionsPagination(0);
     return;
   }
@@ -862,6 +865,10 @@ function buildSubmissionRow(sub) {
   custTd.setAttribute('data-label', 'Customers/day');
   custTd.textContent = sub.customers_per_day ?? '—';
 
+  const regionTd = document.createElement('td');
+  regionTd.setAttribute('data-label', 'Region');
+  regionTd.textContent = sub.region;
+
   const statusTd = document.createElement('td');
   statusTd.setAttribute('data-label', 'Status');
   const statusBadge = document.createElement('span');
@@ -895,6 +902,7 @@ function buildSubmissionRow(sub) {
   tr.appendChild(agentTd);
   tr.appendChild(phoneTd);
   tr.appendChild(custTd);
+  tr.appendChild(regionTd);
   tr.appendChild(statusTd);
   tr.appendChild(detailsTd);
   return tr;
@@ -983,7 +991,7 @@ async function openSubmissionDetail(sub) {
     .select(`
       id, submission_ref, contact_name, business_name, business_address,
       phone_number, years_in_business, customers_per_day, respondent_age,
-      mechanic_count, land_ownership, previous_training, notes, status,
+      mechanic_count, land_ownership, region, previous_training, notes, status,
       submitted_at, created_at,
       users:user_id ( id, name, email ),
       photos ( id, file_path, file_size_bytes, mime_type ),
@@ -1020,6 +1028,7 @@ async function openSubmissionDetail(sub) {
     ['Land ownership', sub.land_ownership || '—'],
     ['Previous training', sub.previous_training || 'None'],
     ['Field user', sub.users ? (sub.users.name || sub.users.email) : 'Unknown'],
+    ['Region', sub.region],
     ['Submitted', sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : '—'],
     ['Status', sub.status]
   ].forEach(([label, value]) => bizSection.appendChild(buildDetailRow(label, value)));
@@ -1143,7 +1152,7 @@ async function exportSubmissionsCsv() {
     const headers = [
       'Submission Ref', 'Business Name', 'Contact Name', 'Business Address',
       'Phone Number', 'Years In Business', 'Customers Per Day',
-      'Respondent Age', 'Mechanics In Workshop', 'Land Ownership', 'Previous Training',
+      'Respondent Age', 'Mechanics In Workshop', 'Land Ownership', 'Region', 'Previous Training',
       'Notes', 'Field User Name', 'Field User Email', 'Status', 'Submitted At', 'Created At',
       'Brands Serviced', 'Photo File Path', 'Photo Size Bytes', 'Latitude', 'Longitude',
       'Location Accuracy (m)', 'Location Captured At'
@@ -1165,7 +1174,7 @@ async function exportSubmissionsCsv() {
         sub.submission_ref, sub.business_name, sub.contact_name, sub.business_address,
         sub.phone_number, sub.years_in_business, sub.customers_per_day,
         sub.respondent_age ?? '', sub.mechanic_count ?? '',
-        sub.land_ownership || '', sub.previous_training || '',
+        sub.land_ownership || '', sub.region || '', sub.previous_training || '',
         sub.notes || '',
         sub.users ? (sub.users.name || '') : '', sub.users ? (sub.users.email || '') : '',
         sub.status, sub.submitted_at || '', sub.created_at,

@@ -93,6 +93,16 @@
         <option value="">All field users</option>
       </select>
       <input type="text" id="sub-filter-brand" class="text-input" placeholder="Brand serviced">
+      <select id="sub-filter-region" class="select-input">
+        <option value="">Every Region</option>
+        <option value="East">East</option>
+        <option value="North-East">North-East</option>
+        <option value="North-Central">North-Central</option>
+        <option value="North-West">North-West</option>
+        <option value="Central">Central</option>
+        <option value="South">South</option>
+        <option value="West">West</option>
+      </select>
       <input type="date" id="sub-filter-from" class="text-input" aria-label="From date">
       <input type="date" id="sub-filter-to" class="text-input" aria-label="To date">
       <input type="number" id="sub-filter-cust-min" class="text-input" placeholder="Min customers/day" min="0">
@@ -113,6 +123,7 @@
             <th>Field user</th>
             <th>Phone</th>
             <th>Customers/day</th>
+            <th>Region</th>
             <th>Status</th>
             <th>Details</th>
           </tr>
