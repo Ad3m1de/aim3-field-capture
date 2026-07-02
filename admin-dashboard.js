@@ -754,7 +754,8 @@ async function buildSubmissionsQuery(filters, { forExport } = {}) {
     .from('submissions')
     .select(`
       id, submission_ref, contact_name, business_name, business_address,
-      phone_number, years_in_business, customers_per_day, notes, status,
+      phone_number, years_in_business, customers_per_day, respondent_age,
+      mechanic_count, land_ownership, previous_training, notes, status,
       submitted_at, created_at,
       users:user_id ( id, name, email ),
       photos ( id, file_path, file_size_bytes, mime_type ),
@@ -981,7 +982,8 @@ async function openSubmissionDetail(sub) {
     .from('submissions')
     .select(`
       id, submission_ref, contact_name, business_name, business_address,
-      phone_number, years_in_business, customers_per_day, notes, status,
+      phone_number, years_in_business, customers_per_day, respondent_age,
+      mechanic_count, land_ownership, previous_training, notes, status,
       submitted_at, created_at,
       users:user_id ( id, name, email ),
       photos ( id, file_path, file_size_bytes, mime_type ),
@@ -1013,6 +1015,10 @@ async function openSubmissionDetail(sub) {
     ['Phone', sub.phone_number],
     ['Years in business', sub.years_in_business],
     ['Customers/day', sub.customers_per_day],
+    ['Respondent age', sub.respondent_age ?? '—'],
+    ['Mechanics in workshop', sub.mechanic_count ?? '—'],
+    ['Land ownership', sub.land_ownership || '—'],
+    ['Previous training', sub.previous_training || 'None'],
     ['Field user', sub.users ? (sub.users.name || sub.users.email) : 'Unknown'],
     ['Submitted', sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : '—'],
     ['Status', sub.status]
@@ -1136,8 +1142,9 @@ async function exportSubmissionsCsv() {
 
     const headers = [
       'Submission Ref', 'Business Name', 'Contact Name', 'Business Address',
-      'Phone Number', 'Years In Business', 'Customers Per Day', 'Notes',
-      'Field User Name', 'Field User Email', 'Status', 'Submitted At', 'Created At',
+      'Phone Number', 'Years In Business', 'Customers Per Day',
+      'Respondent Age', 'Mechanics In Workshop', 'Land Ownership', 'Previous Training',
+      'Notes', 'Field User Name', 'Field User Email', 'Status', 'Submitted At', 'Created At',
       'Brands Serviced', 'Photo File Path', 'Photo Size Bytes', 'Latitude', 'Longitude',
       'Location Accuracy (m)', 'Location Captured At'
     ];
@@ -1156,7 +1163,10 @@ async function exportSubmissionsCsv() {
         : '';
       return [
         sub.submission_ref, sub.business_name, sub.contact_name, sub.business_address,
-        sub.phone_number, sub.years_in_business, sub.customers_per_day, sub.notes || '',
+        sub.phone_number, sub.years_in_business, sub.customers_per_day,
+        sub.respondent_age ?? '', sub.mechanic_count ?? '',
+        sub.land_ownership || '', sub.previous_training || '',
+        sub.notes || '',
         sub.users ? (sub.users.name || '') : '', sub.users ? (sub.users.email || '') : '',
         sub.status, sub.submitted_at || '', sub.created_at,
         brands,

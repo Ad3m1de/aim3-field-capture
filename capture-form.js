@@ -177,7 +177,26 @@ async function loadDraftIntoForm(draft) {
   document.getElementById('phone-number').value = fd.phone_number || '';
   document.getElementById('years-in-business').value = fd.years_in_business ?? '';
   document.getElementById('customers-per-day').value = fd.customers_per_day ?? '';
+  document.getElementById('respondent-age').value = fd.respondent_age ?? '';
+  document.getElementById('mechanic-count').value = fd.mechanic_count ?? '';
+  document.getElementById('land-ownership').value = fd.land_ownership || '';
   document.getElementById('notes').value = fd.notes || '';
+
+  // Restore previous training toggle
+  const trainingToggle = document.getElementById('previous-training-toggle');
+  const trainingField = document.getElementById('previous-training-field');
+  const trainingInput = document.getElementById('previous-training');
+  if (fd.previous_training) {
+    trainingToggle.value = 'yes';
+    trainingField.hidden = false;
+    trainingInput.required = true;
+    trainingInput.value = fd.previous_training;
+  } else {
+    trainingToggle.value = 'no';
+    trainingField.hidden = true;
+    trainingInput.required = false;
+    trainingInput.value = '';
+  }
 
   const brandIds = fd.brand_ids || [];
   document.getElementById('brand-1').value = brandIds[0] || '';
@@ -284,7 +303,18 @@ async function loadBrands() {
   });
 }
 
-// ===== Photo capture + geolocation (captured together, per the brief) =====
+// ===== Previous training toggle =====
+document.getElementById('previous-training-toggle').addEventListener('change', function () {
+  const trainingField = document.getElementById('previous-training-field');
+  const trainingInput = document.getElementById('previous-training');
+  const show = this.value === 'yes';
+  trainingField.hidden = !show;
+  trainingInput.required = show;
+  if (!show) {
+    trainingInput.value = '';
+    setFieldError('previous-training', 'previous-training-error', '');
+  }
+});
 const photoInput = document.getElementById('photo-input');
 const photoPreviewWrap = document.getElementById('photo-preview-wrap');
 const photoPreview = document.getElementById('photo-preview');
@@ -461,6 +491,41 @@ function validateForm() {
     setFieldError('customers-per-day', 'customers-per-day-error', '');
   }
 
+  const respondentAge = document.getElementById('respondent-age').value;
+  if (respondentAge === '' || Number(respondentAge) < 18 || Number(respondentAge) > 100) {
+    setFieldError('respondent-age', 'respondent-age-error', 'Enter a valid age (18–100).');
+    valid = false;
+  } else {
+    setFieldError('respondent-age', 'respondent-age-error', '');
+  }
+
+  const mechanicCount = document.getElementById('mechanic-count').value;
+  if (mechanicCount === '' || Number(mechanicCount) < 0) {
+    setFieldError('mechanic-count', 'mechanic-count-error', 'Enter the number of mechanics.');
+    valid = false;
+  } else {
+    setFieldError('mechanic-count', 'mechanic-count-error', '');
+  }
+
+  const landOwnership = document.getElementById('land-ownership').value;
+  if (!landOwnership) {
+    setFieldError('land-ownership', 'land-ownership-error', 'Select an ownership type.');
+    valid = false;
+  } else {
+    setFieldError('land-ownership', 'land-ownership-error', '');
+  }
+
+  const trainingToggle = document.getElementById('previous-training-toggle').value;
+  if (trainingToggle === 'yes') {
+    const trainingText = document.getElementById('previous-training').value.trim();
+    if (!trainingText) {
+      setFieldError('previous-training', 'previous-training-error', 'Enter the training name.');
+      valid = false;
+    } else {
+      setFieldError('previous-training', 'previous-training-error', '');
+    }
+  }
+
   if (!brand1) {
     setFieldError('brand-error', 'brands-error', '');
     document.getElementById('brands-error').textContent = 'Select at least one brand.';
@@ -478,6 +543,11 @@ function validateForm() {
 }
 
 function collectFormData() {
+  const trainingToggle = document.getElementById('previous-training-toggle').value;
+  const trainingText = trainingToggle === 'yes'
+    ? document.getElementById('previous-training').value.trim()
+    : null;
+
   return {
     submission_ref: document.getElementById('submission-ref').textContent,
     contact_name: document.getElementById('contact-name').value.trim(),
@@ -486,6 +556,10 @@ function collectFormData() {
     phone_number: document.getElementById('phone-number').value.trim(),
     years_in_business: Number(document.getElementById('years-in-business').value),
     customers_per_day: Number(document.getElementById('customers-per-day').value),
+    respondent_age: Number(document.getElementById('respondent-age').value),
+    mechanic_count: Number(document.getElementById('mechanic-count').value),
+    land_ownership: document.getElementById('land-ownership').value,
+    previous_training: trainingText,
     notes: document.getElementById('notes').value.trim(),
     brand_ids: [
       document.getElementById('brand-1').value,
@@ -530,6 +604,10 @@ async function uploadPhotoAndSubmit(formData, photoFile) {
       phone_number: formData.phone_number,
       years_in_business: formData.years_in_business,
       customers_per_day: formData.customers_per_day,
+      respondent_age: formData.respondent_age || null,
+      mechanic_count: formData.mechanic_count ?? null,
+      land_ownership: formData.land_ownership || null,
+      previous_training: formData.previous_training || null,
       notes: formData.notes || null,
       status: 'submitted',
       submitted_at: formData.captured_at,
