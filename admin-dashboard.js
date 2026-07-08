@@ -730,6 +730,7 @@ document.getElementById('sub-filter-clear-btn').addEventListener('click', () => 
   document.getElementById('sub-filter-to').value = '';
   document.getElementById('sub-filter-cust-min').value = '';
   document.getElementById('sub-filter-cust-max').value = '';
+  document.getElementById('sub-filter-sort').value = 'created_desc';
   submissionsPage = 0;
   loadSubmissions();
 });
@@ -744,7 +745,8 @@ function readSubmissionsFilters() {
     fromDate: document.getElementById('sub-filter-from').value,
     toDate: document.getElementById('sub-filter-to').value,
     custMin: document.getElementById('sub-filter-cust-min').value,
-    custMax: document.getElementById('sub-filter-cust-max').value
+    custMax: document.getElementById('sub-filter-cust-max').value,
+    sortBy: document.getElementById('sub-filter-sort').value
   };
 }
 
@@ -763,8 +765,14 @@ async function buildSubmissionsQuery(filters, { forExport, exportRangeFrom, expo
       photos ( id, file_path, file_size_bytes, mime_type ),
       geolocations ( latitude, longitude, accuracy_meters, captured_at ),
       submission_brands ( rank, brands ( name ) )
-    `, forExport ? {} : { count: 'exact' })
-    .order('created_at', { ascending: false });
+    `, forExport ? {} : { count: 'exact' });
+
+  // Sort order — defaults to newest first; "town_asc" sorts alphabetically by town.
+  if (filters.sortBy === 'town_asc') {
+    query = query.order('town', { ascending: true });
+  } else {
+    query = query.order('created_at', { ascending: false });
+  }
 
   if (filters.business) query = query.ilike('business_name', `%${filters.business}%`);
   if (filters.location) query = query.ilike('business_address', `%${filters.location}%`);
