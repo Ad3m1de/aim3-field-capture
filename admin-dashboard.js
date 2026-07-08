@@ -751,7 +751,7 @@ function readSubmissionsFilters() {
 // Builds a Supabase query with every active filter applied. Shared between
 // the paginated table load and the export-all-matching-rows function, so
 // the two never drift out of sync with each other.
-async function buildSubmissionsQuery(filters, { forExport } = {}) {
+async function buildSubmissionsQuery(filters, { forExport, exportRangeFrom, exportRangeTo } = {}) {
   let query = supabaseClient
     .from('submissions')
     .select(`
@@ -805,6 +805,15 @@ async function buildSubmissionsQuery(filters, { forExport } = {}) {
 
   if (!forExport) {
     query = query.range(submissionsPage * SUBMISSIONS_PAGE_SIZE, submissionsPage * SUBMISSIONS_PAGE_SIZE + SUBMISSIONS_PAGE_SIZE - 1);
+  } else if (exportRangeFrom !== undefined && exportRangeTo !== undefined) {
+    // Applied here (before the caller awaits this function) rather than by
+    // chaining .range() onto the caller's result. Supabase's query builder
+    // is itself "thenable" — an async function that returns it gets that
+    // thenable auto-unwrapped by JS's promise machinery the moment it's
+    // awaited, executing the query immediately. Anything chained on
+    // afterward is chained onto the already-resolved {data, error} result,
+    // not the builder, which is why query.range is not a function.
+    query = query.range(exportRangeFrom, exportRangeTo);
   }
 
   return query;
@@ -1141,11 +1150,30 @@ async function exportSubmissionsCsv() {
 
   try {
     // Export respects whatever filters are currently applied, and pulls
-    // every matching row (not just the current page) by querying without
-    // the range() limit.
-    const { data, error } = await buildSubmissionsQuery(lastSubmissionsFilters, { forExport: true });
+    // every matching row (not just the current page). Supabase's PostgREST
+    // API caps any single query at its configured "Max Rows" setting
+    // (1000 by default) regardless of whether .range() is used, so we
+    // page through in batches until a batch comes back short of a full
+    // page — that's how we know we've reached the end.
+    const EXPORT_BATCH_SIZE = 1000;
+    let data = [];
+    let batchIndex = 0;
 
-    if (error) throw error;
+    while (true) {
+      const { data: batch, error } = await buildSubmissionsQuery(lastSubmissionsFilters, {
+        forExport: true,
+        exportRangeFrom: batchIndex * EXPORT_BATCH_SIZE,
+        exportRangeTo: batchIndex * EXPORT_BATCH_SIZE + EXPORT_BATCH_SIZE - 1
+      });
+
+      if (error) throw error;
+
+      data = data.concat(batch || []);
+
+      if (!batch || batch.length < EXPORT_BATCH_SIZE) break;
+      batchIndex++;
+    }
+
     if (!data || data.length === 0) {
       setSubmissionsMessage('No submissions to export with the current filters.', 'error');
       return;
