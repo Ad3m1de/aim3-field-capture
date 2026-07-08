@@ -107,9 +107,14 @@
       <input type="date" id="sub-filter-to" class="text-input" aria-label="To date">
       <input type="number" id="sub-filter-cust-min" class="text-input" placeholder="Min customers/day" min="0">
       <input type="number" id="sub-filter-cust-max" class="text-input" placeholder="Max customers/day" min="0">
-      <select id="sub-filter-sort" class="select-input">
+      <select id="sub-filter-sort" class="select-input" data-default="created_desc">
         <option value="created_desc">Newest first</option>
         <option value="town_asc">Town (A–Z)</option>
+      </select>
+      <select id="sub-filter-flagged" class="select-input" data-default="">
+        <option value="">All submissions</option>
+        <option value="flagged">Flagged only</option>
+        <option value="unflagged">Not flagged</option>
       </select>
       <button id="sub-filter-apply-btn" class="btn-sm" type="button">Apply filters</button>
       <button id="sub-filter-clear-btn" class="icon-btn" type="button">Clear</button>
@@ -129,11 +134,12 @@
             <th>Customers/day</th>
             <th>Region</th>
             <th>Status</th>
+            <th>Flagged</th>
             <th>Details</th>
           </tr>
         </thead>
         <tbody id="submissions-table-body">
-          <tr><td colspan="8" class="table-loading">Loading submissions...</td></tr>
+          <tr><td colspan="9" class="table-loading">Loading submissions...</td></tr>
         </tbody>
       </table>
     </div>

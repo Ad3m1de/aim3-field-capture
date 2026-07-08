@@ -731,6 +731,7 @@ document.getElementById('sub-filter-clear-btn').addEventListener('click', () => 
   document.getElementById('sub-filter-cust-min').value = '';
   document.getElementById('sub-filter-cust-max').value = '';
   document.getElementById('sub-filter-sort').value = 'created_desc';
+  document.getElementById('sub-filter-flagged').value = '';
   submissionsPage = 0;
   loadSubmissions();
 });
@@ -746,7 +747,8 @@ function readSubmissionsFilters() {
     toDate: document.getElementById('sub-filter-to').value,
     custMin: document.getElementById('sub-filter-cust-min').value,
     custMax: document.getElementById('sub-filter-cust-max').value,
-    sortBy: document.getElementById('sub-filter-sort').value
+    sortBy: document.getElementById('sub-filter-sort').value,
+    flaggedFilter: document.getElementById('sub-filter-flagged').value
   };
 }
 
@@ -759,7 +761,7 @@ async function buildSubmissionsQuery(filters, { forExport, exportRangeFrom, expo
     .select(`
       id, submission_ref, contact_name, business_name, business_address, town, state,
       phone_number, years_in_business, customers_per_day, respondent_age,
-      mechanic_count, land_ownership, region, previous_training, notes, status,
+      mechanic_count, land_ownership, region, previous_training, notes, status, flagged,
       submitted_at, created_at,
       users:user_id ( id, name, email ),
       photos ( id, file_path, file_size_bytes, mime_type ),
@@ -767,7 +769,6 @@ async function buildSubmissionsQuery(filters, { forExport, exportRangeFrom, expo
       submission_brands ( rank, brands ( name ) )
     `, forExport ? {} : { count: 'exact' });
 
-  // Sort order — defaults to newest first; "town_asc" sorts alphabetically by town.
   if (filters.sortBy === 'town_asc') {
     query = query.order('town', { ascending: true });
   } else {
@@ -778,6 +779,8 @@ async function buildSubmissionsQuery(filters, { forExport, exportRangeFrom, expo
   if (filters.location) query = query.ilike('business_address', `%${filters.location}%`);
   if (filters.agentId) query = query.eq('user_id', filters.agentId);
   if (filters.region) query = query.eq('region', filters.region);
+  if (filters.flaggedFilter === 'flagged') query = query.eq('flagged', true);
+  if (filters.flaggedFilter === 'unflagged') query = query.eq('flagged', false);
   if (filters.fromDate) query = query.gte('created_at', `${filters.fromDate}T00:00:00`);
   if (filters.toDate) query = query.lte('created_at', `${filters.toDate}T23:59:59`);
   if (filters.custMin !== '') query = query.gte('customers_per_day', Number(filters.custMin));
@@ -830,7 +833,7 @@ async function buildSubmissionsQuery(filters, { forExport, exportRangeFrom, expo
 // ===== Load submissions (paginated table) =====
 async function loadSubmissions() {
   const tbody = document.getElementById('submissions-table-body');
-  tbody.innerHTML = '<tr><td colspan="9" class="table-loading">Loading submissions...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" class="table-loading">Loading submissions...</td></tr>';
   setSubmissionsMessage('', null);
 
   const filters = readSubmissionsFilters();
@@ -839,13 +842,13 @@ async function loadSubmissions() {
   const { data, error, count } = await buildSubmissionsQuery(filters);
 
   if (error) {
-    tbody.innerHTML = '<tr><td colspan="9" class="table-empty">Could not load submissions.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="table-empty">Could not load submissions.</td></tr>';
     setSubmissionsMessage('Could not load submissions: ' + error.message, 'error');
     return;
   }
 
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No submissions match these filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="table-empty">No submissions match these filters.</td></tr>';
     renderSubmissionsPagination(0);
     return;
   }
@@ -893,6 +896,15 @@ function buildSubmissionRow(sub) {
   statusBadge.textContent = sub.status.charAt(0).toUpperCase() + sub.status.slice(1);
   statusTd.appendChild(statusBadge);
 
+  const flaggedTd = document.createElement('td');
+  flaggedTd.setAttribute('data-label', 'Flagged');
+  const flaggedBadge = document.createElement('span');
+  flaggedBadge.className = `badge ${sub.flagged ? 'status-inactive' : 'status-active'}`;
+  flaggedBadge.style.background = sub.flagged ? 'var(--color-error-bg)' : '';
+  flaggedBadge.style.color = sub.flagged ? 'var(--color-error)' : '';
+  flaggedBadge.textContent = sub.flagged ? 'Flagged' : 'No';
+  flaggedTd.appendChild(flaggedBadge);
+
   const detailsTd = document.createElement('td');
   detailsTd.setAttribute('data-label', 'Details');
 
@@ -901,6 +913,13 @@ function buildSubmissionRow(sub) {
   viewBtn.className = 'link-btn';
   viewBtn.textContent = 'View';
   viewBtn.addEventListener('click', () => openSubmissionDetail(sub));
+
+  const flagBtn = document.createElement('button');
+  flagBtn.type = 'button';
+  flagBtn.className = 'link-btn';
+  flagBtn.style.marginLeft = '10px';
+  flagBtn.textContent = sub.flagged ? 'Unflag' : 'Flag';
+  flagBtn.addEventListener('click', () => toggleFlagSubmission(sub));
 
   const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
@@ -911,6 +930,7 @@ function buildSubmissionRow(sub) {
   deleteBtn.addEventListener('click', () => deleteSubmission(sub));
 
   detailsTd.appendChild(viewBtn);
+  detailsTd.appendChild(flagBtn);
   detailsTd.appendChild(deleteBtn);
 
   tr.appendChild(dateTd);
@@ -921,6 +941,7 @@ function buildSubmissionRow(sub) {
   tr.appendChild(custTd);
   tr.appendChild(regionTd);
   tr.appendChild(statusTd);
+  tr.appendChild(flaggedTd);
   tr.appendChild(detailsTd);
   return tr;
 }
@@ -983,6 +1004,29 @@ async function deleteSubmission(sub) {
   await loadSubmissions();
 }
 
+async function toggleFlagSubmission(sub) {
+  const newState = !sub.flagged;
+
+  const { error } = await supabaseClient
+    .from('submissions')
+    .update({ flagged: newState })
+    .eq('id', sub.id);
+
+  if (error) {
+    setSubmissionsMessage('Could not update flag: ' + error.message, 'error');
+    return;
+  }
+
+  setSubmissionsMessage(
+    `Submission ${sub.submission_ref} ${newState ? 'flagged' : 'unflagged'}.`,
+    'success'
+  );
+  // Reload the current filtered/paginated view so the badge and button
+  // label reflect the new state (and so the row disappears if a
+  // flagged/unflagged filter is currently active).
+  await loadSubmissions();
+}
+
 // ===== Submission detail modal =====
 const submissionDetailOverlay = document.getElementById('submission-detail-overlay');
 const submissionDetailContent = document.getElementById('submission-detail-content');
@@ -1008,7 +1052,7 @@ async function openSubmissionDetail(sub) {
     .select(`
       id, submission_ref, contact_name, business_name, business_address, town, state, 
       phone_number, years_in_business, customers_per_day, respondent_age,
-      mechanic_count, land_ownership, region, previous_training, notes, status,
+      mechanic_count, land_ownership, region, previous_training, notes, status, flagged,
       submitted_at, created_at,
       users:user_id ( id, name, email ),
       photos ( id, file_path, file_size_bytes, mime_type ),
@@ -1049,7 +1093,8 @@ async function openSubmissionDetail(sub) {
     ['Field user', sub.users ? (sub.users.name || sub.users.email) : 'Unknown'],
     ['Region', sub.region],
     ['Submitted', sub.submitted_at ? new Date(sub.submitted_at).toLocaleString() : '—'],
-    ['Status', sub.status]
+    ['Status', sub.status],
+    ['Flagged', sub.flagged ? 'Yes' : 'No']
   ].forEach(([label, value]) => bizSection.appendChild(buildDetailRow(label, value)));
   if (sub.notes) {
     bizSection.appendChild(buildDetailRow('Notes', sub.notes));
@@ -1191,7 +1236,7 @@ async function exportSubmissionsCsv() {
       'Submission Ref', 'Business Name', 'Contact Name', 'Business Address', 'Town', 'State',
       'Phone Number', 'Years In Business', 'Customers Per Day',
       'Respondent Age', 'Mechanics In Workshop', 'Land Ownership', 'Region', 'Previous Training',
-      'Notes', 'Field User Name', 'Field User Email', 'Status', 'Submitted At', 'Created At',
+      'Notes', 'Field User Name', 'Field User Email', 'Status', 'Flagged', 'Submitted At', 'Created At',
       'Brands Serviced', 'Photo File Path', 'Photo Size Bytes', 'Latitude', 'Longitude',
       'Location Accuracy (m)', 'Location Captured At'
     ];
@@ -1215,7 +1260,7 @@ async function exportSubmissionsCsv() {
         sub.land_ownership || '', sub.region || '', sub.previous_training || '',
         sub.notes || '',
         sub.users ? (sub.users.name || '') : '', sub.users ? (sub.users.email || '') : '',
-        sub.status, sub.submitted_at || '', sub.created_at,
+        sub.status, sub.flagged ? 'Yes' : 'No', sub.submitted_at || '', sub.created_at,
         brands,
         photo ? photo.file_path : '', photo ? photo.file_size_bytes : '',
         geo ? geo.latitude : '', geo ? geo.longitude : '',
