@@ -1232,12 +1232,61 @@ async function exportSubmissionsCsv() {
       return;
     }
 
+    // Signed URLs let the private bucket stay private: each link embeds a
+    // token that expires after EXPORT_LINK_EXPIRY_SECONDS, rather than
+    // exposing the files publicly.
+    const EXPORT_LINK_EXPIRY_SECONDS = 60 * 60 * 24 * 30; // 30 days
+    const photoPaths = data
+      .map(sub => {
+        const p = Array.isArray(sub.photos) ? sub.photos[0] : sub.photos;
+        return p ? p.file_path : null;
+      })
+      .filter(Boolean);
+
+    let signedUrlByPath = {};
+    let photoLinkWarning = '';
+    if (photoPaths.length > 0) {
+      // createSignedUrls caps out at 1000 paths per call, so chunk large
+      // exports into batches of that size and merge the results.
+      const SIGN_CHUNK_SIZE = 1000;
+      const pathChunks = [];
+      for (let i = 0; i < photoPaths.length; i += SIGN_CHUNK_SIZE) {
+        pathChunks.push(photoPaths.slice(i, i + SIGN_CHUNK_SIZE));
+      }
+
+      for (const chunk of pathChunks) {
+        const { data: signedUrls, error: signError } = await supabaseClient.storage
+          .from('submission-photos')
+          .createSignedUrls(chunk, EXPORT_LINK_EXPIRY_SECONDS);
+
+        if (signError) {
+          console.error('createSignedUrls failed:', signError);
+          photoLinkWarning = ` (Some photo links could not be generated: ${signError.message || signError})`;
+          continue;
+        }
+
+        if (signedUrls) {
+          const failedItems = signedUrls.filter(item => item.error || !item.signedUrl);
+          if (failedItems.length > 0) {
+            console.error('Some signed URLs failed:', failedItems);
+          }
+          signedUrls.forEach(item => {
+            if (item.path && item.signedUrl) signedUrlByPath[item.path] = item.signedUrl;
+          });
+        }
+      }
+
+      if (Object.keys(signedUrlByPath).length === 0 && photoPaths.length > 0 && !photoLinkWarning) {
+        photoLinkWarning = ' (Photo links came back empty — check the browser console for details.)';
+      }
+    }
+
     const headers = [
       'Submission Ref', 'Business Name', 'Contact Name', 'Business Address', 'Town', 'State',
       'Phone Number', 'Years In Business', 'Customers Per Day',
       'Respondent Age', 'Mechanics In Workshop', 'Land Ownership', 'Region', 'Previous Training',
       'Notes', 'Field User Name', 'Field User Email', 'Status', 'Flagged', 'Submitted At', 'Created At',
-      'Brands Serviced', 'Photo File Path', 'Photo Size Bytes', 'Latitude', 'Longitude',
+      'Brands Serviced', 'Photo Link', 'Photo Size Bytes', 'Latitude', 'Longitude',
       'Location Accuracy (m)', 'Location Captured At'
     ];
 
@@ -1253,6 +1302,7 @@ async function exportSubmissionsCsv() {
             .filter(Boolean)
             .join('; ')
         : '';
+      const photoLink = photo ? (signedUrlByPath[photo.file_path] || '') : '';
       return [
         sub.submission_ref, sub.business_name, sub.contact_name, sub.business_address, sub.town, sub.state,
         sub.phone_number, sub.years_in_business, sub.customers_per_day,
@@ -1262,7 +1312,7 @@ async function exportSubmissionsCsv() {
         sub.users ? (sub.users.name || '') : '', sub.users ? (sub.users.email || '') : '',
         sub.status, sub.flagged ? 'Yes' : 'No', sub.submitted_at || '', sub.created_at,
         brands,
-        photo ? photo.file_path : '', photo ? photo.file_size_bytes : '',
+        photoLink, photo ? photo.file_size_bytes : '',
         geo ? geo.latitude : '', geo ? geo.longitude : '',
         geo ? geo.accuracy_meters : '', geo ? geo.captured_at : ''
       ];
@@ -1271,7 +1321,10 @@ async function exportSubmissionsCsv() {
     const csv = buildCsv(headers, rows);
     downloadCsv(csv, `bmc-submissions-${new Date().toISOString().slice(0, 10)}.csv`);
 
-    setSubmissionsMessage(`Exported ${data.length} submission${data.length === 1 ? '' : 's'}.`, 'success');
+    setSubmissionsMessage(
+      `Exported ${data.length} submission${data.length === 1 ? '' : 's'}.${photoLinkWarning}`,
+      photoLinkWarning ? 'error' : 'success'
+    );
   } catch (err) {
     setSubmissionsMessage('Export failed: ' + err.message, 'error');
   } finally {
